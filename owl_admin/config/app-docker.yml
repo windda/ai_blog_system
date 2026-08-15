@@ -1,0 +1,20 @@
+flask:
+  secret_key: 'your_secret_key'
+  debug: false
+  testing: false
+  CORS_ORIGINS: '*'
+  SQLALCHEMY_DATABASE_URI: 'mysql+pymysql://root:123456@mysql:3306/ry-vue-py?charset=utf8mb4'
+  SQLALCHEMY_TRACK_MODIFICATIONS: false
+  SQLALCHEMY_ECHO: false
+  SQLALCHEMY_POOL_SIZE: 10
+  SQLALCHEMY_POOL_TIMEOUT: 30
+  SQLALCHEMY_POOL_RECYCLE: 500
+  REDIS_URL: "redis://redis:6379/1"
+
+log:
+  level: INFO
+  filename: logs/owl.log
+  filesize: 100MB
+  filenum: 10
+  formatter:
+    fmt: '%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'

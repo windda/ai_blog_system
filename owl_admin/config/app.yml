@@ -1,0 +1,20 @@
+owl:
+  name: 'ruoyi-vue-flask'
+  version: '2.0.0'
+  author: 'shaw'
+  host: '127.0.0.1'
+  port: 9000
+  api:
+    version: '/'
+  env: 'dev'
+  profile: './uploads'
+
+# 博客前台配置
+blog:
+  # 匿名展示开关: true=显示"匿名", false=显示真实昵称
+  anonymous_display: false
+
+token:
+    header: 'Authorization'
+    secret: 'abcdefghijklmnopqrstuvwxyz'
+    expireTime: 30

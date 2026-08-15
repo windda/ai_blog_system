@@ -1,0 +1,53 @@
+# Docker 构建忽略文件 - 避免将本地大文件打包到镜像中
+
+# Python
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+*.egg-info
+.venv
+venv
+env
+
+# Node
+node_modules
+owl-ui/node_modules
+owl-ui/.cache
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+logs
+
+# Uploads
+uploads
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist
+owl-ui/dist
+build
+*.egg
+
+# Docker
+.dockerignore
+docker-compose.yml
+
+# 环境变量
+.env
+*.md
+LICENSE
+bin

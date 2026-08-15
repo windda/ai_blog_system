@@ -1,0 +1,87 @@
+# ============================================================
+# Docker Compose - 博客管理系统全栈部署
+# 
+# 适用平台：Linux / Windows / macOS
+# 启动命令：docker compose up -d
+# 访问地址：http://localhost:9000 （如果同时启动前端，请访问 http://localhost）
+#
+# 服务说明：
+#   mysql：    MySQL 8.0 数据库，自动初始化表结构
+#   redis：    Redis 7 缓存
+#   backend：  Flask 3.0 后端 API
+#   frontend： Vue 2 前端页面（Nginx 托管）
+# ============================================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: blog-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: ry-vue-py
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/ry_20230706.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./sql/ruoyi2owl.sql:/docker-entrypoint-initdb.d/02-owl.sql
+      - ./sql/init_seed.sql:/docker-entrypoint-initdb.d/03-seed.sql
+    command: |
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: blog-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blog-backend
+    ports:
+      - "9000:9000"
+    volumes:
+      - uploads_data:/app/uploads
+    environment:
+      - TZ=Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: owl-ui/Dockerfile
+    container_name: blog-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
+  uploads_data:
