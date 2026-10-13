@@ -27,6 +27,7 @@ from flask import Flask, jsonify
 from werkzeug.exceptions import HTTPException
 from owl_common.exception import ServiceException
 from owl_common.base.model import AjaxResponse
+from owl_common.utils.base import UtilException
 
 
 def create_app() -> Flask:
@@ -58,6 +59,14 @@ def create_app() -> Flask:
         return jsonify(AjaxResponse.from_error(
             code=e.code,
             msg=e.description
+        ).model_dump(by_alias=True)), 200
+
+    @app.errorhandler(UtilException)
+    def handle_util_exception(e: UtilException):
+        """工具类异常：如获取当前登录用户失败（未登录/登录已过期）"""
+        return jsonify(AjaxResponse.from_error(
+            code=getattr(e, 'status', 500),
+            msg=str(e)
         ).model_dump(by_alias=True)), 200
 
     @app.errorhandler(HTTPException)

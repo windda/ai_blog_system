@@ -15,10 +15,9 @@
       <div class="container">
         <div class="profile-sidebar">
           <div class="user-card">
-            <el-upload class="avatar-uploader" :action="uploadAvatarUrl" :headers="uploadHeaders"
-              :show-file-list="false" :before-upload="beforeAvatarUpload" :on-success="handleAvatarSuccess" name="avatarfile">
-              <el-avatar :size="80" :src="userAvatar" style="cursor:pointer;margin-bottom:12px;">{{ (userInfo.nickName || userName)[0] }}</el-avatar>
-            </el-upload>
+            <div style="cursor:pointer;margin-bottom:12px;" @click="openAvatarCropper">
+              <el-avatar :size="80" :src="userAvatar">{{ (userInfo.nickName || userName)[0] }}</el-avatar>
+            </div>
             <div class="user-card-name">{{ userInfo.nickName || userName }}</div>
             <div class="user-card-desc">{{ userInfo.remark || '这个人很懒，什么都没写~' }}</div>
           </div>
@@ -55,9 +54,22 @@
           <!-- 文章弹窗 -->
           <el-dialog :title="articleForm.articleId?'编辑文章':'发布文章'" :visible.sync="articleDialogVisible" width="800px" append-to-body>
             <el-form label-width="80px">
-              <el-form-item label="标题"><el-input v-model="articleForm.title" /></el-form-item>
+              <el-form-item label="标题"><el-input v-model="articleForm.title" placeholder="请输入标题" /></el-form-item>
               <el-form-item label="分类"><el-select v-model="articleForm.categoryId" clearable style="width:100%;"><el-option v-for="cat in categoryList" :key="cat.categoryId" :label="cat.categoryName" :value="cat.categoryId" /></el-select></el-form-item>
+              <el-form-item label="封面图">
+                <el-upload class="avatar-uploader" :action="coverUploadUrl" :headers="uploadHeaders" :show-file-list="false" :on-success="handleCoverSuccess" :before-upload="beforeCoverUpload">
+                  <img v-if="articleForm.coverImage" :src="resolveImg(articleForm.coverImage)" style="width:200px;height:112px;object-fit:cover;border-radius:4px;border:1px dashed #d9d9d9;" />
+                  <i v-else class="el-icon-plus" style="font-size:28px;color:#8c939d;width:200px;height:112px;line-height:112px;border:1px dashed #d9d9d9;border-radius:4px;"></i>
+                </el-upload>
+                <el-button v-if="articleForm.coverImage" type="danger" size="mini" icon="el-icon-delete" style="margin-left:8px;" @click="articleForm.coverImage=''">删除封面</el-button>
+              </el-form-item>
               <el-form-item label="摘要"><el-input v-model="articleForm.summary" type="textarea" :rows="2" /></el-form-item>
+              <el-form-item label="状态">
+                <el-radio-group v-model="articleForm.status">
+                  <el-radio label="1">发布</el-radio>
+                  <el-radio label="0">草稿</el-radio>
+                </el-radio-group>
+              </el-form-item>
               <el-form-item label="内容"><editor v-model="articleForm.content" :min-height="300" /></el-form-item>
             </el-form>
             <span slot="footer"><el-button @click="articleDialogVisible=false">取消</el-button><el-button type="primary" @click="saveArticle" :loading="saving">发布</el-button></span>
@@ -119,10 +131,10 @@
             <h2 class="section-title">个人资料</h2>
             <el-form label-width="100px" style="max-width:600px;">
               <el-form-item label="头像">
-                <el-upload class="avatar-uploader" :action="uploadAvatarUrl" :headers="uploadHeaders" :show-file-list="false" :before-upload="beforeAvatarUpload" :on-success="handleAvatarSuccess" name="avatarfile">
-                  <el-avatar :size="60" :src="userAvatar" style="cursor:pointer;">{{ (userInfo.nickName||userName)[0] }}</el-avatar>
+                <div style="cursor:pointer;" @click="openAvatarCropper">
+                  <el-avatar :size="60" :src="userAvatar">{{ (userInfo.nickName||userName)[0] }}</el-avatar>
                   <span style="margin-left:12px;color:#409eff;cursor:pointer;">点击更换头像</span>
-                </el-upload>
+                </div>
               </el-form-item>
               <el-form-item label="昵称"><el-input v-model="userInfo.nickName" /></el-form-item>
               <el-form-item label="邮箱"><el-input v-model="userInfo.email" /></el-form-item>
@@ -141,19 +153,43 @@
         </div>
       </div>
     </div>
+
+    <!-- 头像裁剪弹窗 -->
+    <el-dialog title="修改头像" :visible.sync="avatarCropperVisible" width="800px" append-to-body>
+      <el-row>
+        <el-col :xs="24" :md="12" :style="{height:'350px'}">
+          <vue-cropper ref="cropper" :img="avatarCropperImg" :info="true" :autoCrop="true" :autoCropWidth="200" :autoCropHeight="200" :fixedBox="true" @realTime="avatarRealTime" v-if="avatarCropperVisible" />
+        </el-col>
+        <el-col :xs="24" :md="12" :style="{height:'350px'}">
+          <div style="text-align:center;"><img :src="avatarPreviewUrl" style="width:200px;height:200px;border-radius:50%;" /></div>
+        </el-col>
+      </el-row>
+      <br />
+      <el-row>
+        <el-col :span="24" style="text-align:center;">
+          <el-upload action="#" :http-request="requestAvatarUpload" :show-file-list="false" :before-upload="beforeAvatarCropperUpload" style="display:inline-block;margin-right:10px;">
+            <el-button size="small">选择图片<i class="el-icon-upload el-icon--right"></i></el-button>
+          </el-upload>
+          <el-button icon="el-icon-refresh-left" size="small" @click="avatarRotateLeft"></el-button>
+          <el-button icon="el-icon-refresh-right" size="small" @click="avatarRotateRight"></el-button>
+          <el-button type="primary" size="small" @click="avatarUploadImg">提 交</el-button>
+        </el-col>
+      </el-row>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getToken, removeToken } from '@/utils/auth'
-import { getUserArticles, getUserCollections, getUserComments, getUserHistory, clearUserHistory, updateUserProfile, updateUserPassword, getUserInfo } from '@/api/blog/front'
+import { getUserArticles, getUserCollections, getUserComments, getUserHistory, clearUserHistory, updateUserProfile, updateUserPassword, getUserInfo, uploadAvatar } from '@/api/blog/front'
 import { addFrontArticle, updateFrontArticle, deleteFrontArticle, updateCommentStatus, deleteFrontComment } from '@/api/blog/front'
 import { getFrontCategories } from '@/api/blog/front'
 import Editor from '@/components/Editor'
+import { VueCropper } from "vue-cropper";
 
 export default {
   name: 'FrontProfile',
-  components: { Editor },
+  components: { Editor, VueCropper },
   data() {
     return {
       activeTab: 'articles', loading: false, pageSize: 10, searchKeyword: '',
@@ -165,10 +201,12 @@ export default {
       pwdForm: { oldPwd: '', newPwd: '' },
       savingProfile: false, changingPwd: false,
       articleDialogVisible: false,
-      articleForm: { articleId: null, title: '', summary: '', content: '', categoryId: null },
+      articleForm: { articleId: null, title: '', summary: '', content: '', categoryId: null, coverImage: '', status: '1' },
       saving: false, categoryList: [],
       uploadAvatarUrl: process.env.VUE_APP_BASE_API + '/front/user/avatar',
-      commentDetailVisible: false, detailComment: null
+      coverUploadUrl: process.env.VUE_APP_BASE_API + '/common/upload',
+      commentDetailVisible: false, detailComment: null,
+      avatarCropperVisible: false, avatarCropperImg: '', avatarPreviewUrl: ''
     }
   },
   computed: {
@@ -188,11 +226,19 @@ export default {
   methods: {
     async fetchUserInfo() { try { const res = await getUserInfo(); if (res && res.data) this.userInfo = res.data } catch (e) {} },
     async fetchCategories() { try { const res = await getFrontCategories(); this.categoryList = (res && res.data) ? res.data : [] } catch (e) {} },
-    beforeAvatarUpload(f) { if (!f.type.startsWith('image/')) { this.$message.error('只能上传图片!'); return false } if (f.size/1024/1024>2) { this.$message.error('不超过2MB!'); return false } return true },
-    handleAvatarSuccess(r) { if (r.code===200&&r.data) { this.userInfo.avatar=r.data.avatar; this.$message.success('头像更新成功') } else this.$message.error('上传失败') },
+    openAvatarCropper() { this.avatarCropperImg = this.userAvatar; this.avatarPreviewUrl = this.userAvatar; this.avatarCropperVisible = true; },
+    beforeAvatarCropperUpload(file) { if (file.type.indexOf('image/') == -1) { this.$message.error('请上传图片文件'); return false; } const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => { this.avatarCropperImg = reader.result; }; return false; },
+    requestAvatarUpload() {},
+    avatarRealTime(data) { this.avatarPreviewUrl = data.url; },
+    avatarRotateLeft() { this.$refs.cropper.rotateLeft(); },
+    avatarRotateRight() { this.$refs.cropper.rotateRight(); },
+    avatarUploadImg() { this.$refs.cropper.getCropBlob(data => { const formData = new FormData(); formData.append('avatarfile', data); uploadAvatar(formData).then(res => { if (res.code === 200 && res.data) { this.userInfo.avatar = res.data.avatar; this.$message.success('头像更新成功'); this.avatarCropperVisible = false; } else { this.$message.error('上传失败'); } }).catch(() => this.$message.error('上传失败')); }); },
+    handleCoverSuccess(res) { if (res.code === 200) { this.articleForm.coverImage = res.fileName; this.$message.success('封面上传成功'); } else { this.$message.error('封面上传失败'); } },
+    beforeCoverUpload(file) { const isImg = file.type === 'image/jpeg' || file.type === 'image/png'; const isLt5M = file.size / 1024 / 1024 < 5; if (!isImg) { this.$message.error('只能上传 jpg/png 图片'); return false; } if (!isLt5M) { this.$message.error('图片不能超过 5MB'); return false; } return true; },
+    resolveImg(path) { if (!path) return ''; if (path.startsWith('http')) return path; return process.env.VUE_APP_BASE_API + path; },
     switchTab(tab) { this.activeTab=tab; this.searchKeyword=''; if (tab==='articles') this.fetchArticles(1); else if (tab==='comments') this.fetchComments(1); else if (tab==='collections') this.fetchCollections(1); else if (tab==='history') this.fetchHistory(1) },
     async fetchArticles(p=1) { this.loading=true; try { const r=await getUserArticles({pageNum:p,pageSize:this.pageSize,keyword:this.searchKeyword||undefined}); this.articles=(r&&r.rows)?r.rows:[]; this.articleTotal=(r&&r.total)?r.total:0 } catch(e){this.articles=[]} this.loading=false },
-    openArticleDialog(a) { this.articleForm=a?{articleId:a.articleId,title:a.title||'',summary:a.summary||'',content:a.content||'',categoryId:a.categoryId||null}:{articleId:null,title:'',summary:'',content:'',categoryId:null}; this.articleDialogVisible=true },
+    openArticleDialog(a) { this.articleForm=a?{articleId:a.articleId,title:a.title||'',summary:a.summary||'',content:a.content||'',categoryId:a.categoryId||null,coverImage:a.coverImage||'',status:a.status||'1'}:{articleId:null,title:'',summary:'',content:'',categoryId:null,coverImage:'',status:'1'}; this.articleDialogVisible=true },
     async saveArticle() { if(!this.articleForm.title.trim()) return this.$message.warning('请输入标题'); this.saving=true; try { if(this.articleForm.articleId){await updateFrontArticle(this.articleForm.articleId,this.articleForm);this.$message.success('更新成功')}else{await addFrontArticle(this.articleForm);this.$message.success('发布成功')} this.articleDialogVisible=false; this.fetchArticles(1) } catch(e){this.$message.error('操作失败')} this.saving=false },
     async deleteArticle(id) { try { await this.$confirm('确定删除?','提示',{type:'warning'}); await deleteFrontArticle(id); this.$message.success('已删除'); this.fetchArticles(1) } catch(e) { if(e!=='cancel') this.$message.error('删除失败') } },
     async fetchComments(p=1) { this.loading=true; try { const r=await getUserComments({pageNum:p,pageSize:this.pageSize,keyword:this.searchKeyword||undefined}); this.comments=(r&&r.rows)?r.rows:[] } catch(e){this.comments=[]} this.loading=false },

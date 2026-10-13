@@ -49,7 +49,7 @@ def blog_category_list():
 @PreAuthorize(HasPerm("blog:category:query"))
 @JsonSerializer()
 def blog_category_get(id: int):
-    eo = BlogCategoryService.select_category_id(id)
+    eo = BlogCategoryService.select_category_by_id(id)
     if not eo:
         raise NotFoundException("分类不存在")
     return AjaxResponse.from_success(data=eo)

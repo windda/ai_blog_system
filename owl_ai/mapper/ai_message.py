@@ -38,6 +38,7 @@ class AiMessageMapper:
             is_compressed=msg.is_compressed,
         )
         out = db.session.execute(stmt).inserted_primary_key
+        db.session.commit()
         return out[0] if out else 0
 
     @classmethod
@@ -49,6 +50,7 @@ class AiMessageMapper:
             BowlAiMessage.message_id.in_(message_ids)
         ).values(is_compressed='1')
         db.session.execute(stmt)
+        db.session.commit()
 
     @classmethod
     def update_content(cls, message_id: int, content: str) -> int:
@@ -69,4 +71,6 @@ class AiMessageMapper:
         stmt = delete(BowlAiMessage).where(
             BowlAiMessage.session_id == session_id
         )
-        return db.session.execute(stmt).rowcount
+        result = db.session.execute(stmt)
+        db.session.commit()
+        return result.rowcount

@@ -117,14 +117,24 @@ def system_user_profile_avatar():
         return AjaxResponse.from_error(msg="没有选择文件")
     if file:
         login_user: LoginUser = SecurityUtil.get_login_user()
-        avatar_path = FileUploadUtil.upload(file, OWLConfig.profile)
+        import time
+        upload_dir = os.path.join(OWLConfig.profile, 'avatar')
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir, exist_ok=True)
+        timestamp = str(int(time.time() * 1000))
+        safe_name = secure_filename(file.filename)
+        if '.' not in safe_name:
+            safe_name += '.png'
+        new_filename = f"{timestamp}_{safe_name}"
+        file.save(os.path.join(upload_dir, new_filename))
+        avatar_path = f"/uploads/avatar/{new_filename}"
         num = SysUserService.update_user_avatar(
             login_user.user_name, 
             avatar_path
             )
         if num > 0:
             ajax_response = AjaxResponse.from_success()
-            setattr(ajax_response, "img_url", avatar_path)
+            setattr(ajax_response, "imgUrl", avatar_path)
             login_user.user.avatar = avatar_path
             TokenService.set_login_user(login_user)
             return ajax_response

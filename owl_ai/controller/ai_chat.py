@@ -126,7 +126,7 @@ def ai_chat_http():
         if not msg:
             return AjaxResponse.from_error(msg="消息不能为空")
 
-        context = AiChatService.build_context(user_id, session_id, msg)
+        context, actual_sid = AiChatService.build_context(user_id, session_id, msg)
         usage = None
         has_key = bool(DeepSeekClient.API_KEY and DeepSeekClient.API_KEY.strip())
 
@@ -138,7 +138,7 @@ def ai_chat_http():
             reply_text = DeepSeekClient.chat_sync(context)
 
         reply_text = reply_text or "模型暂无有效回复，请换个问题重试"
-        new_sid = AiChatService.save_reply(user_id, session_id, msg, reply_text)
+        new_sid = AiChatService.save_reply(user_id, actual_sid, msg, reply_text)
 
         if usage and usage.get('total_tokens', 0) > 0:
             try:
@@ -282,8 +282,8 @@ def ai_chat_socket(data):
     msg = data.get('message', '').strip()
     session_id = data.get('sessionId', None)
     if not msg: emit('ai-error', {'msg': '消息不能为空'}); return
-    context = AiChatService.build_context(user_id, session_id, msg)
+    context, actual_sid = AiChatService.build_context(user_id, session_id, msg)
     def on_token(token): socketio.emit('ai-token', {'token': token}, namespace='/ai', room=request.sid)
-    def on_done(full_text): socketio.emit('ai-done', {'fullText': full_text, 'sessionId': AiChatService.save_reply(user_id, session_id, msg, full_text)}, namespace='/ai', room=request.sid)
+    def on_done(full_text): socketio.emit('ai-done', {'fullText': full_text, 'sessionId': AiChatService.save_reply(user_id, actual_sid, msg, full_text)}, namespace='/ai', room=request.sid)
     def on_error(err): socketio.emit('ai-error', {'msg': err}, namespace='/ai', room=request.sid)
     DeepSeekClient.chat_stream(context, on_token=on_token, on_done=on_done, on_error=on_error)

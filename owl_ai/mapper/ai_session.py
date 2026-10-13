@@ -34,6 +34,7 @@ class AiSessionMapper:
             status=session.status,
         )
         out = db.session.execute(stmt).inserted_primary_key
+        db.session.commit()
         return out[0] if out else 0
 
     @classmethod
@@ -44,11 +45,14 @@ class AiSessionMapper:
             BowlAiSession.session_id == session_id
         ).values(**kwargs)
         db.session.execute(stmt)
+        db.session.commit()
 
     @classmethod
     def delete_session(cls, session_id: int) -> int:
         stmt = delete(BowlAiSession).where(BowlAiSession.session_id == session_id)
-        return db.session.execute(stmt).rowcount
+        result = db.session.execute(stmt)
+        db.session.commit()
+        return result.rowcount
     @classmethod
     def select_all(cls) -> List[BowlAiSession]:
         stmt = select(BowlAiSession).order_by(desc(BowlAiSession.update_time))

@@ -122,6 +122,13 @@ def serve_upload(filename):
     return send_from_directory(upload_dir, filename)
 
 
+@reg.api.route('/uploads/avatar/<path:filename>')
+def serve_avatar(filename):
+    """提供头像文件的静态访问（目录：./uploads/avatar/）"""
+    avatar_dir = os.path.join(OWLConfig.profile, 'avatar')
+    return send_from_directory(avatar_dir, filename)
+
+
 @reg.api.route('/static/upload/article/<path:filename>')
 def serve_legacy_upload(filename):
     """兼容旧上传目录：owl_admin/static/upload/article/"""

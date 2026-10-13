@@ -35,7 +35,7 @@ class OwlConfigLoader(object):
             if not os.path.exists(config_file):
                 raise FileNotFoundError(f"Config file {config_file} not found")
             self.load_config(config_file)        
-    
+     
     def _generate_main_config(self) -> str:
         '''
         生成配置文件
@@ -53,7 +53,7 @@ class OwlConfigLoader(object):
         '''
         加载配置文件参数
         '''
-        with open(file, 'r') as f:
+        with open(file, 'r', encoding="utf-8") as f:
             config_obj = yaml.load(f, Loader=yaml.FullLoader)
         self._raw_data.update(config_obj)
         data = DictUtil.recurive_key(config_obj)

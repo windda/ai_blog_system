@@ -18,11 +18,11 @@ ON DUPLICATE KEY UPDATE nick_name=VALUES(nick_name);
 -- 2. 博客分类数据
 -- ============================================================
 INSERT INTO blog_category (category_name, order_num, status, create_by, create_time, remark) VALUES
-('技术分享', 1, '1', 'admin', NOW(), '技术类文章'),
-('生活随笔', 2, '1', 'admin', NOW(), '生活记录'),
-('项目实战', 3, '1', 'admin', NOW(), '实战项目经验'),
-('前端技术', 4, '1', 'admin', NOW(), '前端相关'),
-('后端开发', 5, '1', 'admin', NOW(), '后端技术')
+('技术分享', 1, '0', 'admin', NOW(), '技术类文章'),
+('生活随笔', 2, '0', 'admin', NOW(), '生活记录'),
+('项目实战', 3, '0', 'admin', NOW(), '实战项目经验'),
+('前端技术', 4, '0', 'admin', NOW(), '前端相关'),
+('后端开发', 5, '0', 'admin', NOW(), '后端技术')
 ON DUPLICATE KEY UPDATE category_name=VALUES(category_name);
 
 -- ============================================================
@@ -84,8 +84,7 @@ INSERT INTO blog_comment (article_id, content, author_name, author_email, user_i
 (3, 'Docker 部署确实方便，我之前也在用。建议补充一下 docker-compose 中 healthcheck 的用法。', '王五', 'wangwu@test.com', NULL, '1', '2026-06-12 10:00:00'),
 (3, '多阶段构建的镜像真的小很多，我试过从 800MB 降到 200MB', '赵六', 'zhaoliu@test.com', NULL, '1', '2026-06-12 12:00:00'),
 (4, 'Redis ZSet 做排行榜这个想法很赞！方便说一下如何处理冷启动（没有历史数据）的问题吗？', '小红', 'xiaohong@test.com', NULL, '1', '2026-06-13 17:00:00'),
-(4, 'ZINCRBY 这个命令学到了，之前只知道用 SET/GET', '小明', 'xiaoming@test.com', NULL, '0', '2026-06-13 18:00:00'),
-(1, '这个文章收藏了，准备跟着做一遍', '匿名用户', NULL, NULL, '0', '2026-06-14 09:00:00')
+(4, 'ZINCRBY 这个命令学到了，之前只知道用 SET/GET', '小明', 'xiaoming@test.com', NULL, '0', '2026-06-13 18:00:00')
 ON DUPLICATE KEY UPDATE content=VALUES(content);
 
 -- ============================================================

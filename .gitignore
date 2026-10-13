@@ -9,6 +9,8 @@ bin-release/
 
 .venv/
 venv/
+env/
+/package-lock.json
 .tests/
 .vscode/
 .idea/

@@ -187,18 +187,21 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="封面图">
-              <el-upload
-                class="avatar-uploader"
-                :action="uploadUrl"
-                :headers="uploadHeaders"
-                :show-file-list="false"
-                :on-success="handleCoverSuccess"
-                :before-upload="handleCoverBefore"
-              >
-                <img v-if="form.coverImage" :src="resolveImageUrl(form.coverImage)" class="cover-preview" />
-                <i v-else class="el-icon-plus avatar-uploader-icon"></i>
-                <div slot="tip" class="el-upload__tip">建议尺寸 800x400，支持 jpg/png，不超过 5MB</div>
-              </el-upload>
+              <div>
+                <el-upload
+                  class="avatar-uploader"
+                  :action="uploadUrl"
+                  :headers="uploadHeaders"
+                  :show-file-list="false"
+                  :on-success="handleCoverSuccess"
+                  :before-upload="handleCoverBefore"
+                >
+                  <img v-if="form.coverImage" :src="resolveImageUrl(form.coverImage)" class="cover-preview" />
+                  <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+                </el-upload>
+                <el-button v-if="form.coverImage" type="danger" size="mini" icon="el-icon-delete" style="margin-left:8px;" @click="removeCover">删除封面</el-button>
+              </div>
+              <div class="el-upload__tip">建议尺寸 800x400，支持 jpg/png，不超过 5MB</div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -367,6 +370,10 @@ export default {
       } else {
         this.$message.error("封面上传失败: " + (res.msg || '未知错误'));
       }
+    },
+    removeCover() {
+      this.form.coverImage = '';
+      this.$message.success("封面已删除");
     },
     /**
      * 智能解析图片URL：兼容新旧存储格式

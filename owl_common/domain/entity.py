@@ -432,3 +432,14 @@ class TreeSelect(BaseModel):
     @classmethod
     def from_dept(cls, dept: SysDept) -> "TreeSelect":
         return cls(id=dept.dept_id, label=dept.dept_name, children=[cls.from_dept(child) for child in dept.children])
+
+
+# ============================================================
+# 解析前向引用（字符串类型注解，如 "SysDept" / "SysRole" / "SysUser"）
+# 避免 Pydantic 序列化时出现 'MockValSer' object cannot be converted to 'SchemaSerializer' 错误
+# ============================================================
+for _model in [LoginUser, SysUser, SysRole, SysMenu, SysDictType, SysDictData, SysDept, TreeSelect]:
+    try:
+        _model.model_rebuild()
+    except Exception:
+        pass

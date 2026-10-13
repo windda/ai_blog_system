@@ -64,13 +64,19 @@
 
         <aside class="sidebar">
           <div class="widget search-widget"><el-input placeholder="搜索文章..." v-model="keyword" size="medium" @keyup.enter.native="searchArticles"><el-button slot="append" icon="el-icon-search" @click="searchArticles"></el-button></el-input></div>
-          <div class="widget" v-if="siteNotice">
+          <div class="widget" v-if="siteNotices.length > 0">
             <h3 class="widget-title">📢 公告</h3>
-            <div class="notice-content" v-html="siteNotice"></div>
+            <div class="notice-content" v-for="n in siteNotices" :key="n.noticeId">
+              <div class="notice-title">{{ n.noticeTitle }}</div>
+              <div v-html="n.noticeContent"></div>
+            </div>
           </div>
           <div class="widget">
             <h3 class="widget-title">📋 关于本站</h3>
-            <div class="about-content"><p>个人技术博客，分享编程经验与技术思考。</p><p style="color:#909399;font-size:12px;margin-top:4px;">🚀 Flask + Vue 全栈项目实战</p></div>
+            <div class="about-content">
+              <p>专注分享后端开发（Python/Flask）、前端技术（Vue）、数据库与部署（MySQL/Redis/Docker）实战经验的个人技术博客。</p>
+              <p style="color:#909399;font-size:12px;margin-top:4px;">🚀 Flask 3.0 + Vue 2 + MySQL + Redis 全栈构建 · 支持文章发布、评论互动、AI 对话</p>
+            </div>
           </div>
           <div class="widget">
             <h3 class="widget-title">🔥 热门文章</h3>
@@ -126,7 +132,7 @@ export default {
       queryParams: { pageNum: 1, pageSize: 5, keyword: undefined, categoryId: undefined },
       hotArticles: [], categoryList: [], tagList: [], keyword: '', selectedCategory: null,
       tagTypes: ['', 'success', 'info', 'warning', 'danger'], searchTimer: null,
-      siteNotice: '', friendLinks: [],
+      siteNotices: [], friendLinks: [],
       unreadCount: 0, notices: [], showNotices: false
     }
   },
@@ -147,7 +153,7 @@ export default {
     async fetchHotArticles() { try { const res = await getHotArticles({ limit: 5 }); this.hotArticles = res.data || [] } catch (e) {} },
     async fetchCategories() { try { const res = await getFrontCategories(); this.categoryList = res.data || [] } catch (e) {} },
     async fetchTags() { try { const res = await getFrontTags(); this.tagList = res.data || [] } catch (e) {} },
-    async fetchNotice() { try { const res = await request({ url: '/front/notice', method: 'get' }); if (res && res.data) { this.siteNotice = res.data.noticeContent || '' } } catch (e) {} },
+    async fetchNotice() { try { const res = await request({ url: '/front/notice', method: 'get' }); if (res && res.data) { this.siteNotices = Array.isArray(res.data) ? res.data : [] } } catch (e) {} },
     async fetchFriendLinks() { try { const res = await request({ url: '/front/friend-links', method: 'get' }); this.friendLinks = (res && res.data) ? res.data : [] } catch (e) {} },
     async fetchUnreadCount() { try { const res = await request({ url: '/front/user/notices/unread-count', method: 'get' }); this.unreadCount = (res && res.data) ? (res.data.count || 0) : 0 } catch (e) {} },
     async fetchNotices() { try { const res = await request({ url: '/front/user/notices', method: 'get', params: { pageSize: 20 } }); this.notices = (res && res.rows) ? res.rows : [] } catch (e) {} },
@@ -190,7 +196,8 @@ export default {
 .article-summary { margin: 0; color: #666; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .widget { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 .widget-title { margin: 0 0 12px; font-size: 16px; color: #333; padding-bottom: 8px; border-bottom: 2px solid #f0f0f0; }
-.notice-content { font-size: 13px; color: #e6a23c; line-height: 1.6; padding: 8px; background: #fdf6ec; border-radius: 4px; }
+.notice-content { font-size: 13px; color: #e6a23c; line-height: 1.6; padding: 8px; background: #fdf6ec; border-radius: 4px; margin-bottom: 8px; }
+.notice-title { font-weight: bold; color: #d4890b; margin-bottom: 4px; }
 .about-content { font-size: 14px; color: #666; }
 .hot-item { display: flex; align-items: center; padding: 8px 0; cursor: pointer; }
 .hot-rank { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 10px; background: #f0f0f0; color: #666; }

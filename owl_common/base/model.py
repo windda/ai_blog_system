@@ -507,7 +507,7 @@ class PageModel(VoModel):
         frozen = False,
         extra = "forbid",
         strict = True,
-        populate_by_name = False,
+        populate_by_name = True,
     )
     
     page_num: Annotated[

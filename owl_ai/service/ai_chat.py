@@ -48,7 +48,7 @@ class AiChatService:
         recent = cls.get_recent_messages(session.session_id)
         for r in recent:
             context.append({"role": r["role"], "content": r["content"]})
-        return context
+        return context, session.session_id
 
     @classmethod
     def save_reply(cls, user_id: int, session_id: Optional[int], user_msg: str, ai_reply: str) -> int:

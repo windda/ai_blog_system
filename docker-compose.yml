@@ -25,8 +25,10 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./sql/ry_20230706.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./sql/ruoyi2owl.sql:/docker-entrypoint-initdb.d/02-owl.sql
-      - ./sql/init_seed.sql:/docker-entrypoint-initdb.d/03-seed.sql
+      - ./sql/blog_init.sql:/docker-entrypoint-initdb.d/02-blog.sql
+      - ./sql/ruoyi2owl.sql:/docker-entrypoint-initdb.d/03-owl.sql
+      - ./sql/init_seed.sql:/docker-entrypoint-initdb.d/04-seed.sql
+      - ./sql/demo_data.sql:/docker-entrypoint-initdb.d/05-demo.sql
     command: |
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4

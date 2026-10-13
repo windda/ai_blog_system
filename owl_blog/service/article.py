@@ -28,44 +28,19 @@ class BlogArticleService:
     @classmethod
     def select_article_list(cls, query: BlogArticle) -> List[BlogArticle]:
         """
-        查询文章列表（公开列表走Redis缓存）
+        查询文章列表（分页由 mapper 层处理）
         """
-        # 只有查"已发布+无筛选条件"时才走缓存
-        is_pub_list = (
-            query is not None
-            and query.status == '1'
-            and query.title is None
-            and query.category_id is None
-            and query.author_id is None
-        )
-
-        if is_pub_list:
-            try:
-                cached = redis_cache.get(CACHE_KEY_PUB_LIST)
-                if cached:
-                    data = json.loads(cached)
-                    return [BlogArticle(**item) for item in data]
-            except Exception:
-                pass  # 缓存异常不影响主流程，继续查数据库
-
-        # 查数据库
-        rows = BlogArticleMapper.select_article_list(query)
-
-        # 写入缓存
-        if is_pub_list and rows:
-            try:
-                data = [r.model_dump(mode='json') for r in rows]
-                redis_cache.setex(CACHE_KEY_PUB_LIST, 300, json.dumps(data))  # 5分钟过期
-            except Exception:
-                pass
-
-        return rows
+        return BlogArticleMapper.select_article_list(query)
 
     @classmethod
     def _clear_pub_cache(cls):
         """清除公开列表缓存（新增/修改/删除时调用）"""
         try:
             redis_cache.delete(CACHE_KEY_PUB_LIST)
+            # 同时清除前台首页文章列表缓存（blog:front:article_list:*）
+            keys = redis_cache.keys("blog:front:article_list*")
+            if keys:
+                redis_cache.delete(*keys)
         except Exception:
             pass
 

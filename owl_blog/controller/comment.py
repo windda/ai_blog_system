@@ -141,13 +141,11 @@ def blog_comment_add(dto: BlogComment):
         dto.content = sanitize_xss(dto.content)
 
     dto.create_time = datetime.datetime.now()
-    # 审核策略：文章作者在自己文章下评论 → 自动通过
-    auto_approved = (article.author_id == current_user.user_id)
-    dto.status = "1" if auto_approved else "0"
+    # 个人博客场景：评论即时发布，作者/管理员可事后删除，无需审核
+    dto.status = "1"
     BlogCommentService.insert_comment(dto)
 
-    msg = "评论成功" if auto_approved else "评论成功，等待审核"
-    return AjaxResponse.from_success(msg=msg)
+    return AjaxResponse.from_success(msg="评论成功")
 
 
 @reg.api.route("/blog/comment/status", methods=["PUT"])
@@ -214,8 +212,11 @@ def blog_comment_delete(ids: Annotated[List[int], BeforeValidator(ids_to_list)])
             raise NotFoundException("评论不存在")
 
         if not is_admin(current_user):
+            # 评论所有者本人，或文章作者（管理自己文章下的评论），可删除；游客评论需管理员
             if comment.user_id != current_user.user_id:
-                raise ForbiddenException("只能删除自己的评论")
+                article = BlogArticleMapper.select_article_by_id(comment.article_id)
+                if not (article and article.author_id == current_user.user_id):
+                    raise ForbiddenException("只能删除自己的评论")
 
         BlogCommentService.delete_comment_by_id(comment_id)
 

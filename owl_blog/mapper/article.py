@@ -105,7 +105,10 @@ class BlogArticleMapper:
         stmt = stmt.order_by(BlogArticlePo.is_top.desc(), BlogArticlePo.create_time.desc())
         
         if "criterian_meta" in g and g.criterian_meta.page:
-            g.criterian_meta.page.stmt = stmt
+            page = g.criterian_meta.page
+            count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+            page.total = db.session.execute(count_stmt).scalar() or 0
+            stmt = stmt.limit(page.page_size).offset((page.page_num - 1) * page.page_size)
         
         rows = db.session.execute(stmt).all()
         articles = []

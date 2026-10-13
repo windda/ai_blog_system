@@ -16,7 +16,7 @@ from sqlalchemy import select
 from owl_common.base.model import AjaxResponse, TableResponse, CriterianMeta, PageModel
 from owl_common.descriptor.serializer import JsonSerializer
 from owl_blog.domain.entity import BlogArticle
-from owl_blog.service import BlogArticleService, BlogCategoryService, BlogTagService
+from owl_blog.service import BlogArticleService, BlogCategoryService, BlogTagService, BlogCommentService
 from owl_blog.mapper.article import BlogArticleMapper
 from owl_blog.mapper.category import BlogCategoryMapper
 from owl_blog.mapper.tag import BlogTagMapper
@@ -106,7 +106,12 @@ def front_article_list():
             pass
 
     if from_cache:
-        rows = rows_data
+        if isinstance(rows_data, dict):
+            rows = rows_data.get('rows', [])
+            if 'total' in rows_data:
+                page.total = rows_data['total']
+        else:
+            rows = rows_data
     else:
         rows = BlogArticleService.select_article_list(dto)
 
@@ -133,7 +138,8 @@ def front_article_list():
             table_resp = TableResponse(rows=rows)
             serialized = table_resp.model_dump_json(by_alias=True)
             serialized_data = json.loads(serialized)
-            redis_cache.setex(cache_key, 1800, json.dumps(serialized_data['rows'], default=str))
+            cache_data = {"rows": serialized_data['rows'], "total": serialized_data.get('total', len(rows))}
+            redis_cache.setex(cache_key, 1800, json.dumps(cache_data, default=str))
         except Exception:
             pass
 
@@ -512,12 +518,22 @@ def front_user_avatar_upload():
     if file.filename == '':
         return AjaxResponse.from_error(msg="没有选择文件")
     import os
-    from owl_common.utils.base import FileUploadUtil
+    import time
+    from werkzeug.utils import secure_filename
     from owl_common.config import OWLConfig
-    path = FileUploadUtil.upload(file, OWLConfig.profile)
+    upload_dir = os.path.join(OWLConfig.profile, 'avatar')
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir, exist_ok=True)
+    timestamp = str(int(time.time() * 1000))
+    safe_name = secure_filename(file.filename)
+    if '.' not in safe_name:
+        safe_name += '.png'
+    new_filename = f"{timestamp}_{safe_name}"
+    file.save(os.path.join(upload_dir, new_filename))
+    avatar_path = f"/uploads/avatar/{new_filename}"
     from owl_system.service import SysUserService
-    SysUserService.update_profile(user_id, avatar=path)
-    return AjaxResponse.from_success(data={"avatar": path}, msg="头像上传成功")
+    SysUserService.update_profile(user_id, avatar=avatar_path)
+    return AjaxResponse.from_success(data={"avatar": avatar_path}, msg="头像上传成功")
 
 
 @reg.api.route("/front/user/password/update", methods=["PUT"])
@@ -556,7 +572,7 @@ def front_user_article_add():
         cover_image=data.get('coverImage') or None,
         category_id=data.get('categoryId') or None,
         author_id=user_id,
-        status='1'
+        status=data.get('status', '1')
     )
     dto.create_by_user(str(user_id))
     BlogArticleService.insert_article(dto)
@@ -583,7 +599,7 @@ def front_user_article_update(article_id: int):
         summary=data.get('summary', '').strip() or None,
         cover_image=data.get('coverImage') or None,
         category_id=data.get('categoryId') or None,
-        status='1'
+        status=data.get('status', '1')
     )
     dto.update_by_user(str(user_id))
     BlogArticleService.update_article(dto)
@@ -624,7 +640,7 @@ def front_user_comment_update_status(comment_id: int):
         return AjaxResponse.from_error(msg="只能管理自己文章下的评论")
     data = request.get_json() or {}
     new_status = str(data.get('status', '1'))
-    BlogCommentMapper.update_comment_status(comment_id, new_status)
+    BlogCommentService.update_comment_status(comment_id, new_status)
     return AjaxResponse.from_success(msg="评论状态已更新")
 
 
@@ -641,11 +657,11 @@ def front_user_comment_delete(comment_id: int):
         from owl_common.exception import NotFoundException
         raise NotFoundException("评论不存在")
     if comment.user_id == user_id:
-        BlogCommentMapper.delete_comment_by_id(comment_id)
+        BlogCommentService.delete_comment_by_id(comment_id)
         return AjaxResponse.from_success(msg="评论已删除")
     article = BlogArticleMapper.select_article_by_id(comment.article_id)
     if article and article.author_id == user_id:
-        BlogCommentMapper.delete_comment_by_id(comment_id)
+        BlogCommentService.delete_comment_by_id(comment_id)
         return AjaxResponse.from_success(msg="评论已删除")
     return AjaxResponse.from_error(msg="无权删除此评论")
 
@@ -682,13 +698,20 @@ from owl_system.service import SysNoticeService
 @reg.api.route("/front/notice", methods=["GET"])
 @JsonSerializer()
 def front_notice():
-    """前台最新公告"""
+    """前台公告列表（仅公告类型 notice_type='2'）"""
     from owl_system.domain.po import SysNoticePo
-    stmt = select(SysNoticePo).where(SysNoticePo.status == '0').order_by(SysNoticePo.create_time.desc()).limit(1)
-    row = db.session.execute(stmt).scalar_one_or_none()
-    if row:
-        return AjaxResponse.from_success(data={"noticeTitle": row.notice_title or '', "noticeContent": row.notice_content or ''})
-    return AjaxResponse.from_success(data={"noticeTitle": '', "noticeContent": ''})
+    stmt = select(SysNoticePo).where(
+        SysNoticePo.status == '0',
+        SysNoticePo.notice_type == '2'
+    ).order_by(SysNoticePo.create_time.desc())
+    rows = db.session.execute(stmt).scalars().all()
+    result = [{
+        "noticeId": r.notice_id,
+        "noticeTitle": r.notice_title or '',
+        "noticeContent": r.notice_content or '',
+        "createTime": str(r.create_time) if r.create_time else ''
+    } for r in rows]
+    return AjaxResponse.from_success(data=result)
 
 
 # ==================== 站内通知接口 ====================

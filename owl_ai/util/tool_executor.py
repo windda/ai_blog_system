@@ -119,8 +119,8 @@ class ToolExecutor:
                 content=sanitize_html(content),
                 author_id=user_id,
                 status='0',  # 草稿状态
-                create_by=str(user_id)
             )
+            dto.create_by_user(str(user_id))
             BlogArticleService.insert_article(dto)
             return f"文章草稿《{title}》已成功创建并保存到您的后台。您可以在「我的文章」中查看和编辑。"
         except Exception as e:
