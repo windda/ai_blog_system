@@ -184,6 +184,7 @@ class BlogArticleMapper:
             .where(BlogArticlePo.article_id == article_id) \
             .values(view_count=BlogArticlePo.view_count + 1)
         db.session.execute(stmt)
+        db.session.commit()
 
     @classmethod
     def increment_like_count(cls, article_id: int):

@@ -43,6 +43,47 @@ def _check_rate_limit(user_id):
 
 # ==================== REST 接口 ====================
 
+@reg.api.route("/ai/config", methods=["GET"])
+@JsonSerializer()
+def ai_config_get():
+    """查询当前用户的 AI 配置状态（不返回明文 Key，返回打码预览）"""
+    user_id = SecurityUtil.get_user_id()
+    from owl_ai.util.ai_config import get_api_key, get_model, has_api_key, mask_key
+    key = get_api_key(user_id)
+    return AjaxResponse.from_success(data={
+        "configured": has_api_key(user_id),
+        "model": get_model(user_id),
+        "maskedKey": mask_key(key) if key else ''
+    })
+
+
+@reg.api.route("/ai/config", methods=["POST"])
+@JsonSerializer()
+def ai_config_save():
+    """保存当前用户的 DeepSeek API Key + 模型（BYOK 模式，key 存本地文件）"""
+    user_id = SecurityUtil.get_user_id()
+    data = request.get_json(silent=True) or {}
+    api_key = (data.get('apiKey') or '').strip()
+    model = (data.get('model') or '').strip()
+    from owl_ai.util.ai_config import save_config, has_api_key, is_valid_key
+    if not api_key and not has_api_key(user_id):
+        return AjaxResponse.from_error(msg="API Key 不能为空")
+    if api_key and not is_valid_key(api_key):
+        return AjaxResponse.from_error(msg="API Key 格式不正确（应为 sk- 开头的英文字母数字组合）")
+    ok = save_config(user_id, api_key, model)
+    return AjaxResponse.from_success(msg="保存成功") if ok else AjaxResponse.from_error(msg="保存失败")
+
+
+@reg.api.route("/ai/config", methods=["DELETE"])
+@JsonSerializer()
+def ai_config_clear():
+    """清除当前用户的 DeepSeek API Key"""
+    user_id = SecurityUtil.get_user_id()
+    from owl_ai.util.ai_config import clear_config
+    ok = clear_config(user_id)
+    return AjaxResponse.from_success(msg="已清除") if ok else AjaxResponse.from_error(msg="清除失败")
+
+
 @reg.api.route("/ai/chat/history", methods=["GET"])
 @JsonSerializer()
 def ai_chat_history():
@@ -127,15 +168,14 @@ def ai_chat_http():
             return AjaxResponse.from_error(msg="消息不能为空")
 
         context, actual_sid = AiChatService.build_context(user_id, session_id, msg)
-        usage = None
-        has_key = bool(DeepSeekClient.API_KEY and DeepSeekClient.API_KEY.strip())
+        api_key = DeepSeekClient._get_api_key(user_id)
+        if not api_key:
+            return AjaxResponse.from_error(msg="请先配置 DeepSeek API Key（点击右上角「设置 Key」）")
 
-        if has_key:
-            result = DeepSeekClient.chat_sync_with_tools(context, user_id)
-            reply_text = result.get("reply") if result else None
-            usage = result.get("usage") if result else None
-        else:
-            reply_text = DeepSeekClient.chat_sync(context)
+        usage = None
+        result = DeepSeekClient.chat_sync_with_tools(context, user_id)
+        reply_text = result.get("reply") if result else None
+        usage = result.get("usage") if result else None
 
         reply_text = reply_text or "模型暂无有效回复，请换个问题重试"
         new_sid = AiChatService.save_reply(user_id, actual_sid, msg, reply_text)
@@ -147,7 +187,7 @@ def ai_chat_http():
                     prompt_tokens=usage.get('prompt_tokens', 0),
                     completion_tokens=usage.get('completion_tokens', 0),
                     total_tokens=usage.get('total_tokens', 0),
-                    model=DeepSeekClient.MODEL
+                    model=DeepSeekClient._get_model(user_id)
                 )
                 db.session.add(record)
                 db.session.commit()

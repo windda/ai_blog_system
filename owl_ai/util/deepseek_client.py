@@ -23,18 +23,32 @@ class DeepSeekClient:
     """DeepSeek API 客户端"""
 
     # 从环境变量读取配置
-    API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
     BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
-    _raw_model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
-    # 模型名称校验：不合法自动降级 flash
-    _SUPPORTED_MODELS = {"deepseek-chat", "deepseek-flash", "deepseek-v4-flash", "deepseek-coder"}
-    MODEL = _raw_model if _raw_model in _SUPPORTED_MODELS else "deepseek-flash"
+    _DEFAULT_MODEL = "deepseek-chat"
     SYSTEM_PROMPT = os.environ.get(
         "DEEPSEEK_SYSTEM_PROMPT",
         "你是一个智能对话助手，请用简洁清晰的中文回答问题。"
     )
     TIMEOUT = 30       # 请求超时秒数
     MAX_RETRIES = 2    # 最大重试次数
+
+    @classmethod
+    def _get_api_key(cls, user_id=None) -> str:
+        """获取 API Key（BYOK：只从本地 ai_config.json 读，不读环境变量）"""
+        try:
+            from owl_ai.util.ai_config import get_api_key
+            return get_api_key(user_id)
+        except Exception:
+            return ''
+
+    @classmethod
+    def _get_model(cls, user_id=None) -> str:
+        """动态获取模型名：优先本地 ai_config.json（BYOK）"""
+        try:
+            from owl_ai.util.ai_config import get_model
+            return get_model(user_id)
+        except Exception:
+            return cls._DEFAULT_MODEL
 
     @classmethod
     def _build_messages(cls, context: list) -> list:
@@ -73,6 +87,12 @@ class DeepSeekClient:
         - 每行格式: data: {"choices":[{"delta":{"content":"你好"}}]}
         - "[DONE]" 表示流结束
         """
+        api_key = cls._get_api_key()
+        if not api_key:
+            if on_error:
+                on_error("请先配置 DeepSeek API Key（点击右上角「设置 Key」）")
+            return
+
         messages = cls._build_messages(context)
         full_reply = []
 
@@ -81,12 +101,12 @@ class DeepSeekClient:
                 response = requests.post(
                     f"{cls.BASE_URL}/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {cls.API_KEY}",
+                        "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
                         "Accept": "text/event-stream",
                     },
                     json={
-                        "model": cls.MODEL,
+                        "model": cls._get_model(),
                         "messages": messages,
                         "stream": True,
                         "temperature": 0.7,
@@ -176,6 +196,16 @@ class DeepSeekClient:
         """
         from owl_ai.util.tool_executor import ToolExecutor
 
+        api_key = cls._get_api_key(user_id)
+        if not api_key:
+            return {"reply": "请先配置 DeepSeek API Key", "tool_used": False, "usage": None}
+        try:
+            from owl_ai.util.ai_config import is_valid_key
+            if not is_valid_key(api_key):
+                return {"reply": "API Key 格式不正确，请检查后重新配置（应为 sk- 开头的英文字母数字组合）", "tool_used": False, "usage": None}
+        except Exception:
+            pass
+
         messages, tools = cls._build_messages_with_tools(context)
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
@@ -191,9 +221,9 @@ class DeepSeekClient:
         try:
             response = requests.post(
                 f"{cls.BASE_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {cls.API_KEY}", "Content-Type": "application/json"},
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": cls.MODEL,
+                    "model": cls._get_model(user_id),
                     "messages": messages,
                     "tools": tools,
                     "tool_choice": "auto",
@@ -203,7 +233,17 @@ class DeepSeekClient:
                 timeout=cls.TIMEOUT
             )
             if not response.ok:
-                return {"reply": None, "tool_used": False, "usage": total_usage}
+                err_msg = f"API 请求失败（{response.status_code}）"
+                try:
+                    err_data = response.json()
+                    err_msg = err_data.get('error', {}).get('message', err_msg)
+                except Exception:
+                    pass
+                if response.status_code == 401:
+                    err_msg = "API Key 无效或已过期，请检查后重新配置"
+                elif response.status_code == 429:
+                    err_msg = "请求过于频繁或账户余额不足，请稍后再试"
+                return {"reply": err_msg, "tool_used": False, "usage": total_usage}
 
             data = response.json()
             usage1 = data.get("usage", {})
@@ -243,9 +283,9 @@ class DeepSeekClient:
 
             response2 = requests.post(
                 f"{cls.BASE_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {cls.API_KEY}", "Content-Type": "application/json"},
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": cls.MODEL,
+                    "model": cls._get_model(user_id),
                     "messages": messages,
                     "temperature": 0.7,
                     "max_tokens": 4096
@@ -265,6 +305,9 @@ class DeepSeekClient:
 
         except requests.exceptions.Timeout:
             return {"reply": "生成内容耗时较长，请重新提问", "tool_used": True, "usage": total_usage}
-        except Exception:
-            return {"reply": None, "tool_used": False, "usage": total_usage}
+        except requests.exceptions.ConnectionError:
+            return {"reply": "网络连接失败，请检查网络后重试", "tool_used": False, "usage": total_usage}
+        except Exception as e:
+            traceback.print_exc()
+            return {"reply": f"AI 服务调用异常（{type(e).__name__}）：{e}", "tool_used": False, "usage": total_usage}
 

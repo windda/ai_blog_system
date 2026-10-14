@@ -9,6 +9,7 @@
 """
 
 import os
+import sys
 import time
 from flask import request, send_from_directory
 from pydantic import Field
@@ -115,18 +116,23 @@ def common_upload():
     return ajax_response
 
 
+def _upload_dir(*sub):
+    """上传文件目录：打包环境用 exe 同目录（可写），开发环境用 profile 相对路径"""
+    if getattr(sys, 'frozen', False):
+        return os.path.join(os.path.dirname(sys.executable), 'uploads', *sub)
+    return os.path.join(OWLConfig.profile, *sub)
+
+
 @reg.api.route('/uploads/article/<path:filename>')
 def serve_upload(filename):
     """提供上传文件的静态访问（新目录：./uploads/upload/article/）"""
-    upload_dir = os.path.join(OWLConfig.profile, 'upload', 'article')
-    return send_from_directory(upload_dir, filename)
+    return send_from_directory(_upload_dir('upload', 'article'), filename)
 
 
 @reg.api.route('/uploads/avatar/<path:filename>')
 def serve_avatar(filename):
     """提供头像文件的静态访问（目录：./uploads/avatar/）"""
-    avatar_dir = os.path.join(OWLConfig.profile, 'avatar')
-    return send_from_directory(avatar_dir, filename)
+    return send_from_directory(_upload_dir('avatar'), filename)
 
 
 @reg.api.route('/static/upload/article/<path:filename>')

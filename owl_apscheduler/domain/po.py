@@ -3,7 +3,7 @@
 
 from typing import Optional
 from sqlalchemy import CHAR, DateTime, String, text
-from sqlalchemy.dialects.mysql import BIGINT 
+from sqlalchemy import Integer 
 from sqlalchemy.orm import Mapped, mapped_column 
 import datetime
 
@@ -14,7 +14,7 @@ class SysJobPo(db.Model):
     __tablename__ = 'sys_job'
     __table_args__ = {'comment': '定时任务调度表'}
 
-    job_id: Mapped[int] = mapped_column(BIGINT(20), primary_key=True, comment='任务ID')
+    job_id: Mapped[int] = mapped_column(Integer, primary_key=True, comment='任务ID')
     job_name: Mapped[str] = mapped_column(String(64), primary_key=True, server_default=text("''"), comment='任务名称')
     job_group: Mapped[str] = mapped_column(String(64), primary_key=True, server_default=text("'DEFAULT'"), comment='任务组名')
     invoke_target: Mapped[str] = mapped_column(String(500), comment='调用目标字符串')
@@ -33,7 +33,7 @@ class SysJobLogPo(db.Model):
     __tablename__ = 'sys_job_log'
     __table_args__ = {'comment': '定时任务调度日志表'}
 
-    job_log_id: Mapped[int] = mapped_column(BIGINT(20), primary_key=True, comment='任务日志ID')
+    job_log_id: Mapped[int] = mapped_column(Integer, primary_key=True, comment='任务日志ID')
     job_name: Mapped[str] = mapped_column(String(64), comment='任务名称')
     job_group: Mapped[str] = mapped_column(String(64), comment='任务组名')
     invoke_target: Mapped[str] = mapped_column(String(500), comment='调用目标字符串')

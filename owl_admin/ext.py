@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 # @Author  : shaw-lee
 
-from werkzeug.local import LocalProxy
-from flask import current_app
-
-from flask_redis import FlaskRedis
 from flask_login import LoginManager
 from flask_cors import CORS
-from redis import Redis
 
 from owl_common.owl.extension import FlaskOwl
 from owl_common.sqlalchemy.extension import SQLAlchemy
+from owl_common.utils.memory_redis import memory_redis
      
 
 owl = FlaskOwl()
@@ -59,9 +55,7 @@ cors = CORS(
     }
 )
 
-fredis = FlaskRedis()
-redis_cache:Redis = LocalProxy(
-    lambda: current_app.extensions["redis"]._redis_client
-) 
+# 移除 Redis 外部依赖：使用内存版 Redis（单机打包交付场景）
+redis_cache = memory_redis
 lm = LoginManager()
 db = SQLAlchemy()

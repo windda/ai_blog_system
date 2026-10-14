@@ -420,7 +420,8 @@ class IpUtil:
             ip = request.headers['HTTP_X_FORWARDED_FOR']
         elif 'REMOTE_ADDR' in request.headers:
             ip = request.headers['REMOTE_ADDR']
-        ip, _ = request.host.rsplit(':', 1)
+        if not ip:
+            ip = (request.host or '').rsplit(':', 1)[0]
         ip = "127.0.0.1" if ip == "localhost" else ip
         return ip
     

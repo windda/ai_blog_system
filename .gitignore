@@ -62,3 +62,19 @@ selenium-debug.log
 .env
 .env.*
 !.env.example
+
+# Python 打包产物
+build/
+dist/
+installer_output/
+
+# SQLite 数据库（本地数据，不提交）
+instance/
+*.db
+*.db-journal
+
+# AI 用户配置（含用户自己的 Key）
+ai_config.json
+
+# 迁移脚本产生的临时文件
+sql/_tmp_restore.sql

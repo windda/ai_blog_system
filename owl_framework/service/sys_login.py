@@ -109,7 +109,7 @@ class LoginService:
             ServiceException: 验证码过期
         """
         verify_key = Constants.CAPTCHA_CODE_KEY + str(uuid)
-        captcha:bytes = redis_cache.get(verify_key)
+        captcha = redis_cache.get(verify_key)
         if not captcha:
             logininfor = cls.build_logininfor(
                 username, 
@@ -119,7 +119,8 @@ class LoginService:
             TaskManager.execute(record_logininfor,logininfor)
             raise ServiceException("验证码无效")
         redis_cache.delete(verify_key)
-        if captcha.decode("utf-8").lower() != code.lower():
+        captcha_str = captcha.decode("utf-8") if isinstance(captcha, bytes) else captcha
+        if captcha_str.lower() != code.lower():
             logininfor = cls.build_logininfor(
                 username, 
                 Constants.LOGIN_FAIL, 

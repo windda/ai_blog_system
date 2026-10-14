@@ -71,6 +71,7 @@ class SysJobLog(BaseEntity):
     
     job_log_id: Annotated[
         Optional[int],
+        Field(default=None),
         BeforeValidator(str_to_int)
     ]
     

@@ -3,12 +3,9 @@ flask:
   debug: false
   testing: true
   CORS_ORIGINS: '*'
-  SQLALCHEMY_DATABASE_URI: 'mysql+pymysql://root:123456@127.0.0.1/ry-vue-py'
+  SQLALCHEMY_DATABASE_URI: 'sqlite:///app.db'
   SQLALCHEMY_TRACK_MODIFICATIONS: true
   SQLALCHEMY_ECHO: false
-  SQLALCHEMY_POOL_SIZE: 5
-  SQLALCHEMY_POOL_TIMEOUT: 10
-  SQLALCHEMY_POOL_RECYCLE: 500
   REDIS_URL: "redis://127.0.0.1:6379/1"
 
 log:

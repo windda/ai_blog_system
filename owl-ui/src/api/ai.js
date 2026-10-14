@@ -29,3 +29,18 @@ export function clearAllSessions() {
 export function sendMessage(data, config = {}) {
   return request({ url: '/ai/chat', method: 'post', data, timeout: config.timeout || 8000 })
 }
+
+// 查询 AI 配置状态（是否已配置 Key、当前模型、打码预览）
+export function getAiConfig() {
+  return request({ url: '/ai/config', method: 'get' })
+}
+
+// 保存 AI API Key + 模型（BYOK）
+export function saveAiConfig(apiKey, model) {
+  return request({ url: '/ai/config', method: 'post', data: { apiKey, model } })
+}
+
+// 清除 AI API Key
+export function clearAiConfig() {
+  return request({ url: '/ai/config', method: 'delete' })
+}

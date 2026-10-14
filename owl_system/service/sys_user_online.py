@@ -84,11 +84,13 @@ class SysUserOnlineService:
         Returns:
             List[SysUserOnline]: 登录信息列表
         """
-        keys:list[bytes] = redis_cache.keys(Constants.LOGIN_TOKEN_KEY + "*");
+        keys = redis_cache.keys(Constants.LOGIN_TOKEN_KEY + "*");
         online_users = []
         for key in keys:
-            key_decoded = key.decode("utf-8")
+            key_decoded = key.decode("utf-8") if isinstance(key, bytes) else key
             user_json = redis_cache.get(key_decoded)
+            if not user_json:
+                continue
             loginuser = LoginUser.model_validate_json(user_json)
             onlineuser:SysUserOnline = SysUserOnline.from_loginuser(loginuser)
             if query.ip_addr and query.user_name:

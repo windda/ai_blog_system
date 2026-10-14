@@ -31,6 +31,50 @@ def path_to_module(file_path:str, root_path:str) -> str:
     return module_path
 
 
+# PyInstaller 打包（frozen）环境下，os.listdir 无法发现模块目录（模块被编译进 PYZ 压缩包），
+# 因此硬编码 owl_* 顶层模块及其 controller 子模块列表，保证路由正常注册。
+FROZEN_MODULES = [
+    'owl_admin', 'owl_ai', 'owl_apscheduler', 'owl_blog',
+    'owl_common', 'owl_framework', 'owl_system',
+]
+
+FROZEN_CONTROLLERS = [
+    'owl_admin.controller.common.common',
+    'owl_admin.controller.index.captcha',
+    'owl_admin.controller.index.index',
+    'owl_admin.controller.index.login',
+    'owl_admin.controller.index.register',
+    'owl_admin.controller.monitor.cache',
+    'owl_admin.controller.monitor.logininfo',
+    'owl_admin.controller.monitor.operlog',
+    'owl_admin.controller.monitor.server',
+    'owl_admin.controller.monitor.user_online',
+    'owl_admin.controller.system.config',
+    'owl_admin.controller.system.dept',
+    'owl_admin.controller.system.dict_data',
+    'owl_admin.controller.system.dict_type',
+    'owl_admin.controller.system.menu',
+    'owl_admin.controller.system.notice',
+    'owl_admin.controller.system.post',
+    'owl_admin.controller.system.profile',
+    'owl_admin.controller.system.role',
+    'owl_admin.controller.system.user',
+    'owl_blog.controller.article',
+    'owl_blog.controller.category',
+    'owl_blog.controller.comment',
+    'owl_blog.controller.dashboard',
+    'owl_blog.controller.front',
+    'owl_blog.controller.tag',
+    'owl_ai.controller.ai_chat',
+    'owl_apscheduler.controller.job',
+    'owl_apscheduler.controller.job_log',
+]
+
+
+def _is_frozen() -> bool:
+    return getattr(sys, 'frozen', False)
+
+
 class OwlModuleRegistry(object):
     
     module_prefix = "owl_"
@@ -56,20 +100,30 @@ class OwlModuleRegistry(object):
         self.import_modules()
         self.register_controllers()
     
-    def import_modules(self):
-        '''
-        导入所有模块
-        '''
+    def _discover_modules(self):
+        """发现 owl_* 模块名（frozen 环境硬编码，开发环境扫目录）"""
+        if _is_frozen():
+            return [m for m in FROZEN_MODULES]
+        result = []
         for modname in os.listdir(self.proot):
             if not modname.startswith(self.module_prefix):
                 continue
             if modname in self.exclude_modules:
                 continue
-            if not os.path.exists(
-                os.path.join(self.proot,modname,"__init__.py")
-            ):
-                self.app.logger.warning(f"模块路径不存在__init__.py文件: {modname}")
-                continue
+            result.append(modname)
+        return result
+
+    def import_modules(self):
+        '''
+        导入所有模块
+        '''
+        for modname in self._discover_modules():
+            if not _is_frozen():
+                if not os.path.exists(
+                    os.path.join(self.proot, modname, "__init__.py")
+                ):
+                    self.app.logger.warning(f"模块路径不存在__init__.py文件: {modname}")
+                    continue
             self.import_module(modname)
         
     def import_module(self, modname:str):
@@ -110,12 +164,7 @@ class OwlModuleRegistry(object):
         '''
         注册所有控制层路由
         '''
-        for modname in os.listdir(self.proot):
-            
-            if not modname.startswith(self.module_prefix):
-                continue
-            if modname in self.exclude_modules:
-                continue
+        for modname in self._discover_modules():
             if not self.is_registered_module(modname):
                 continue
             self.register_controller(modname)
@@ -128,15 +177,22 @@ class OwlModuleRegistry(object):
         Args:
             mod (str): 模块名称
         '''
-        modpath = os.path.join(self.proot,modname)
-        mod_con_path = os.path.join(modpath,self.controller_name)
+        if _is_frozen():
+            # frozen 环境：直接导入该模块硬编码的 controller 子模块
+            prefix = modname + '.controller.'
+            for c in FROZEN_CONTROLLERS:
+                if c.startswith(prefix):
+                    import_module(c)
+            return
+        modpath = os.path.join(self.proot, modname)
+        mod_con_path = os.path.join(modpath, self.controller_name)
         if not os.path.exists(mod_con_path):
-            return  
+            return
         try:
             self._register_rules(mod_con_path)
         except Exception as e:
             raise Exception(
-                "在模块中的路由，注册失败: {}，原因: {}".format(modname,str(e))
+                "在模块中的路由，注册失败: {}，原因: {}".format(modname, str(e))
             )
     
     def unregister_controller(self, modname:str):

@@ -51,9 +51,9 @@ class SysConfigService:
             str|NoneType: 配置值
         """
         config = SysConfig(config_key=key)
-        value:bytes = redis_cache.get(cls.get_cache_key(key))
+        value = redis_cache.get(cls.get_cache_key(key))
         if value:
-            return value.decode("utf-8")
+            return value.decode("utf-8") if isinstance(value, bytes) else value
         eo = SysConfigMapper.select_config(config)
         if eo is None:
             return None

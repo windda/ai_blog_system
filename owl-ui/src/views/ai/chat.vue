@@ -37,11 +37,37 @@
       </span>
     </el-dialog>
 
+    <!-- 配置 API Key 弹窗 -->
+    <el-dialog title="配置 DeepSeek AI" :visible.sync="configDialogVisible" width="480px" append-to-body>
+      <el-form label-width="80px">
+        <el-form-item label="API Key">
+          <el-input v-model="apiKeyInput" type="password" show-password :placeholder="configured ? '已配置，留空表示不修改' : '请输入你的 DeepSeek API Key（sk-...）'" />
+          <div v-if="maskedKey" style="font-size:12px;color:#909399;margin-top:4px;">当前已配置：{{ maskedKey }}</div>
+        </el-form-item>
+        <el-form-item label="模型">
+          <el-select v-model="configModel" placeholder="选择模型" style="width:100%">
+            <el-option label="deepseek-chat（通用对话）" value="deepseek-chat" />
+            <el-option label="deepseek-reasoner（推理）" value="deepseek-reasoner" />
+            <el-option label="deepseek-flash（快速·便宜）" value="deepseek-flash" />
+          </el-select>
+        </el-form-item>
+        <div style="font-size:12px;color:#909399;line-height:1.6;">
+          Key 仅保存在本机配置文件，不会上传或打包进程序，请放心使用。可在 platform.deepseek.com 申请。
+        </div>
+      </el-form>
+      <span slot="footer">
+        <el-button v-if="configured" type="danger" style="float:left" @click="clearConfig">清除 Key</el-button>
+        <el-button @click="configDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveConfig">保存</el-button>
+      </span>
+    </el-dialog>
+
     <!-- 右侧聊天区域 -->
     <div class="chat-panel">
       <div class="chat-header">
         <span>{{ currentSessionTitle || '新对话' }}</span>
         <span class="limit-tip" v-if="remaining !== null">今日剩余：<strong>{{ remaining }}</strong> 次</span>
+        <el-button size="mini" icon="el-icon-setting" @click="openConfig">设置 Key</el-button>
       </div>
 
       <div class="chat-messages" ref="msgContainer">
@@ -72,7 +98,7 @@
 </template>
 
 <script>
-import { getSessions, getHistory, deleteSession, renameSession, sendMessage as apiSend } from '@/api/ai'
+import { getSessions, getHistory, deleteSession, renameSession, sendMessage as apiSend, getAiConfig, saveAiConfig, clearAiConfig } from '@/api/ai'
 import { getToken } from '@/utils/auth'
 
 export default {
@@ -81,7 +107,8 @@ export default {
     return {
       sessions: [], currentSessionId: null, messages: [], inputText: '',
       isLoading: false, remaining: null,
-      renameDialogVisible: false, renameForm: { sessionId: null, title: '' }
+      renameDialogVisible: false, renameForm: { sessionId: null, title: '' },
+      configDialogVisible: false, apiKeyInput: '', configured: false, maskedKey: '', configModel: 'deepseek-chat'
     }
   },
   computed: {
@@ -93,6 +120,7 @@ export default {
   created() {
     if (!getToken()) { this.$router.push('/login'); return }
     this.loadSessions()
+    this.loadConfig()
   },
   methods: {
     async loadSessions() {
@@ -165,7 +193,49 @@ export default {
       return content.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\n/g, '<br>').replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '').replace(/on\w+\s*=\s*"[^"]*"/gi, '')
     },
     scrollToBottom() { this.$nextTick(() => { const el = this.$refs.msgContainer; if (el) el.scrollTop = el.scrollHeight }) },
-    goHome() { this.$router.push('/') }
+    goHome() { this.$router.push('/') },
+    // 加载 AI 配置状态
+    async loadConfig() {
+      try {
+        const res = await getAiConfig()
+        this.configured = !!(res.data && res.data.configured)
+        this.maskedKey = (res.data && res.data.maskedKey) || ''
+        this.configModel = (res.data && res.data.model) || 'deepseek-chat'
+      } catch (e) {}
+    },
+    // 打开配置弹窗
+    openConfig() {
+      this.apiKeyInput = ''
+      this.configDialogVisible = true
+    },
+    // 保存 API Key
+    async saveConfig() {
+      const key = this.apiKeyInput.trim()
+      if (!key && !this.configured) return this.$message.warning('请输入 API Key')
+      try {
+        await saveAiConfig(key, this.configModel)
+        this.configDialogVisible = false
+        this.configured = true
+        this.$message.success('保存成功')
+      } catch (e) {
+        this.$message.error('保存失败，请重试')
+      }
+    },
+    // 清除 API Key
+    async clearConfig() {
+      try {
+        await this.$confirm('确定清除已保存的 API Key？', '提示', { type: 'warning' })
+      } catch (e) { return }
+      try {
+        await clearAiConfig()
+        this.configured = false
+        this.maskedKey = ''
+        this.apiKeyInput = ''
+        this.$message.success('已清除')
+      } catch (e) {
+        this.$message.error('清除失败，请重试')
+      }
+    }
   }
 }
 </script>

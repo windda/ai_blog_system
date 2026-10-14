@@ -168,17 +168,12 @@ def front_article_detail(id: int):
     if anonymous_display:
         eo.author_name = None
 
+    # 浏览量：直接写数据库持久化（移除 Redis 后，不再依赖定时任务同步）
     try:
-        new_pv = redis_cache.hincrby(PV_COUNTER_KEY, str(id), 1)
-        if eo.view_count is not None:
-            eo.view_count = max(eo.view_count, new_pv)
-    except Exception:
-        BlogArticleMapper.increment_view_count(id)
+        BlogArticleService.increment_view_count(id)
         if eo.view_count is not None:
             eo.view_count += 1
-
-    try:
-        redis_cache.zincrby(HOT_ARTICLES_KEY, 1, str(id))
+        _invalidate_article_cache()  # 清列表缓存，让首页封面浏览量实时更新
     except Exception:
         pass
 
@@ -190,29 +185,15 @@ def front_article_detail(id: int):
 @reg.api.route("/front/hot-articles", methods=["GET"])
 @JsonSerializer()
 def front_hot_articles():
-    """热门文章排行"""
+    """热门文章排行（按浏览量 view_count 降序）"""
     limit = min(safe_int(request.args.get('limit'), 5), 20)
-    article_ids = []
-    try:
-        hot_ids = redis_cache.zrevrange(HOT_ARTICLES_KEY, 0, limit - 1)
-        article_ids = [int(x) for x in hot_ids]
-    except Exception:
-        pass
-
-    if not article_ids:
-        from sqlalchemy import select
-        from owl_blog.domain.po import BlogArticlePo
-        stmt = select(BlogArticlePo.article_id, BlogArticlePo.title, BlogArticlePo.view_count) \
-            .where(BlogArticlePo.status == '1') \
-            .order_by(BlogArticlePo.view_count.desc()).limit(limit)
-        rows = db.session.execute(stmt).all()
-        articles = [{"articleId": r.article_id, "title": r.title, "viewCount": r.view_count or 0} for r in rows]
-    else:
-        articles = []
-        for aid in article_ids:
-            article = BlogArticleMapper.select_article_by_id(aid)
-            if article and article.status == '1':
-                articles.append({"articleId": article.article_id, "title": article.title, "viewCount": article.view_count or 0})
+    from sqlalchemy import select
+    from owl_blog.domain.po import BlogArticlePo
+    stmt = select(BlogArticlePo.article_id, BlogArticlePo.title, BlogArticlePo.view_count) \
+        .where(BlogArticlePo.status == '1') \
+        .order_by(BlogArticlePo.view_count.desc()).limit(limit)
+    rows = db.session.execute(stmt).all()
+    articles = [{"articleId": r.article_id, "title": r.title, "viewCount": r.view_count or 0} for r in rows]
     return AjaxResponse.from_success(data=articles)
 
 

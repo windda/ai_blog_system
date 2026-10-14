@@ -106,13 +106,13 @@ class DashboardService:
         # 按天分组统计文章发布数
         rows = db.session.execute(
             select(
-                func.date_format(BlogArticlePo.create_time, '%Y-%m-%d').label('date'),
+                func.strftime('%Y-%m-%d', BlogArticlePo.create_time).label('date'),
                 func.count(BlogArticlePo.article_id).label('count')
             )
             .where(BlogArticlePo.create_time >= start_date)
             .where(BlogArticlePo.status == '1')
-            .group_by(text('date'))
-            .order_by(text('date ASC'))
+            .group_by(func.strftime('%Y-%m-%d', BlogArticlePo.create_time))
+            .order_by(func.strftime('%Y-%m-%d', BlogArticlePo.create_time))
         ).all()
 
         # 填充空白日期（没有发布的日期补0）
