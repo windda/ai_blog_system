@@ -1,31 +1,14 @@
 # ============================================================
-# Dockerfile - 博客管理系统前端
+# Dockerfile - 博客管理系统前端（预编译方案）
 #
-# 注意：构建上下文是项目根目录（docker-compose 中设置）
-# 所以 COPY 路径相对于项目根目录
+# 前端已在本地用 npm run build:prod 打包好 owl-ui/dist，
+# 这里只负责用 nginx 托管静态文件，不在容器内编译（避免服务器内存不足 OOM）。
 # ============================================================
 
-# ---- 构建阶段 ----
-FROM node:16-alpine AS build-stage
+FROM nginx:alpine
 
-WORKDIR /app
-
-# 复制依赖文件
-COPY owl-ui/package.json ./
-RUN npm install --registry=https://registry.npmmirror.com
-
-# 复制前端源码
-COPY owl-ui/ .
-
-# 构建（Linux 兼容 + 内存优化：2C2G 服务器 Node 内存溢出，加大内存上限 + 跳过 lint）
-ENV NODE_OPTIONS=--openssl-legacy-provider
-RUN node --max-old-space-size=2048 node_modules/.bin/vue-cli-service build --no-lint
-
-# ---- 生产阶段 ----
-FROM nginx:alpine AS production-stage
-
-# 复制编译产物
-COPY --from=build-stage /app/dist /usr/share/nginx/html
+# 复制本地打包好的前端产物
+COPY owl-ui/dist /usr/share/nginx/html
 
 # 复制 Nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
