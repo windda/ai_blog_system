@@ -1,0 +1,4 @@
+# 前端构建忽略（context 是 owl-ui 目录）
+# 注意：不要忽略 dist（预编译方案需要 COPY dist）
+node_modules
+.cache

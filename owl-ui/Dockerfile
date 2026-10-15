@@ -7,8 +7,8 @@
 
 FROM nginx:alpine
 
-# 复制本地打包好的前端产物
-COPY owl-ui/dist /usr/share/nginx/html
+# 复制本地打包好的前端产物（构建上下文是 owl-ui 目录）
+COPY dist /usr/share/nginx/html
 
 # 复制 Nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
