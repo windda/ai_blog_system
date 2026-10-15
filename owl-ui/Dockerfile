@@ -17,9 +17,9 @@ RUN npm install --registry=https://registry.npmmirror.com
 # 复制前端源码
 COPY owl-ui/ .
 
-# 构建（Linux 兼容：package.json 里是 Windows 的 SET 命令，容器里用 ENV + npx 绕过）
+# 构建（Linux 兼容 + 内存优化：2C2G 服务器 Node 内存溢出，加大内存上限 + 跳过 lint）
 ENV NODE_OPTIONS=--openssl-legacy-provider
-RUN npx vue-cli-service build
+RUN node --max-old-space-size=2048 node_modules/.bin/vue-cli-service build --no-lint
 
 # ---- 生产阶段 ----
 FROM nginx:alpine AS production-stage
