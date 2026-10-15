@@ -104,15 +104,21 @@ class DashboardService:
         start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         # 按天分组统计文章发布数
+        # 按天分组的日期表达式：SQLite 用 strftime，MySQL 用 date_format（双兼容）
+        if db.engine.dialect.name == 'sqlite':
+            date_expr = func.strftime('%Y-%m-%d', BlogArticlePo.create_time)
+        else:
+            date_expr = func.date_format(BlogArticlePo.create_time, '%Y-%m-%d')
+
         rows = db.session.execute(
             select(
-                func.strftime('%Y-%m-%d', BlogArticlePo.create_time).label('date'),
+                date_expr.label('date'),
                 func.count(BlogArticlePo.article_id).label('count')
             )
             .where(BlogArticlePo.create_time >= start_date)
             .where(BlogArticlePo.status == '1')
-            .group_by(func.strftime('%Y-%m-%d', BlogArticlePo.create_time))
-            .order_by(func.strftime('%Y-%m-%d', BlogArticlePo.create_time))
+            .group_by(date_expr)
+            .order_by(date_expr)
         ).all()
 
         # 填充空白日期（没有发布的日期补0）

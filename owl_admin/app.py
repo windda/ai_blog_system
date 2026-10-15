@@ -76,7 +76,7 @@ def create_app() -> Flask:
     Returns:
         Flask: flask应用
     """
-    from owl_admin.ext import db, lm, cors, owl, socketio
+    from owl_admin.ext import db, lm, cors, owl, socketio, redis_cache, USE_REAL_REDIS
     from owl_common.base.signal import app_completed
 
     app = Flask(__name__, static_folder=None)
@@ -92,6 +92,8 @@ def create_app() -> Flask:
 
     cors.init_app(app)
     db.init_app(app)
+    if USE_REAL_REDIS:
+        redis_cache.init_app(app)
     lm.init_app(app)
     socketio.init_app(app)
 

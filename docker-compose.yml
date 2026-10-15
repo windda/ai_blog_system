@@ -65,6 +65,7 @@ services:
       - uploads_data:/app/uploads
     environment:
       - TZ=Asia/Shanghai
+      - REDIS_URL=redis://redis:6379/1
     depends_on:
       mysql:
         condition: service_healthy

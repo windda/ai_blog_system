@@ -55,7 +55,14 @@ cors = CORS(
     }
 )
 
-# 移除 Redis 外部依赖：使用内存版 Redis（单机打包交付场景）
-redis_cache = memory_redis
+# Redis 双兼容：docker 部署（有 REDIS_URL 环境变量）用真 Redis，本地/打包用内存 Redis
+USE_REAL_REDIS = bool(os.environ.get('REDIS_URL'))
+
+if USE_REAL_REDIS:
+    from flask_redis import FlaskRedis
+    redis_cache = FlaskRedis()
+else:
+    redis_cache = memory_redis
+
 lm = LoginManager()
 db = SQLAlchemy()
