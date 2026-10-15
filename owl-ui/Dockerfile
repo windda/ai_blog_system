@@ -17,8 +17,9 @@ RUN npm install --registry=https://registry.npmmirror.com
 # 复制前端源码
 COPY owl-ui/ .
 
-# 构建
-RUN npm run build:prod
+# 构建（Linux 兼容：package.json 里是 Windows 的 SET 命令，容器里用 ENV + npx 绕过）
+ENV NODE_OPTIONS=--openssl-legacy-provider
+RUN npx vue-cli-service build
 
 # ---- 生产阶段 ----
 FROM nginx:alpine AS production-stage
