@@ -38,3 +38,4 @@ bleach==6.2.0
 flask-socketio==5.4.1
 elasticsearch==8.15.0
 elasticsearch-dsl==8.15.0
+requests==2.32.3
