@@ -11,7 +11,7 @@ FROM node:16-alpine AS build-stage
 WORKDIR /app
 
 # 复制依赖文件
-COPY owl-ui/package.json owl-ui/package-lock.json ./
+COPY owl-ui/package.json ./
 RUN npm install --registry=https://registry.npmmirror.com
 
 # 复制前端源码
