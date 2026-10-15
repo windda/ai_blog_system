@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: nginx:alpine
+    image: nginx:1.25-alpine
     container_name: blog-frontend
     ports:
       - "80:80"
