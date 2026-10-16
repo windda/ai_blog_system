@@ -1,3 +1,7 @@
+owl:
+  host: '0.0.0.0'
+  port: 9000
+
 flask:
   secret_key: 'your_secret_key'
   debug: false
