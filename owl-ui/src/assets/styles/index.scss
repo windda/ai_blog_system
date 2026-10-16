@@ -189,3 +189,55 @@ aside {
 .multiselect--active {
   z-index: 1000 !important;
 }
+
+// ============================================================
+// 移动端全局响应式适配（后台管理）
+// ============================================================
+@media (max-width: 768px) {
+  .app-container {
+    padding: 12px;
+  }
+
+  // 弹窗宽度自适应（覆盖内联 width，如 width="600px"）
+  .el-dialog {
+    width: 92% !important;
+    margin-top: 4vh !important;
+  }
+
+  .el-dialog__body {
+    padding: 15px;
+  }
+
+  // 确认框/输入框弹窗宽度
+  .el-message-box {
+    width: 90% !important;
+  }
+
+  // 搜索表单：输入框和按钮竖排
+  .filter-container .filter-item {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  // 行内表单竖排
+  .el-form--inline .el-form-item {
+    display: block;
+    margin-right: 0;
+  }
+
+  // 分页组件居中、可换行
+  .pagination-container {
+    text-align: center;
+  }
+  .pagination-container .el-pagination {
+    white-space: normal;
+    text-align: center;
+  }
+
+  // 表格单元格内边距缩小，更紧凑
+  .el-table th.el-table__cell,
+  .el-table td.el-table__cell {
+    padding: 6px 0;
+  }
+}
+
