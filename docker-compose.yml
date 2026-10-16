@@ -29,6 +29,7 @@ services:
       - ./sql/ruoyi2owl.sql:/docker-entrypoint-initdb.d/03-owl.sql
       - ./sql/init_seed.sql:/docker-entrypoint-initdb.d/04-seed.sql
       - ./sql/demo_data.sql:/docker-entrypoint-initdb.d/05-demo.sql
+      - ./sql/blog_menu.sql:/docker-entrypoint-initdb.d/06-menu.sql
     command: |
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4
