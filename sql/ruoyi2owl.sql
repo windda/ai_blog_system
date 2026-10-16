@@ -1,3 +1,4 @@
+SET NAMES utf8mb4;
 
 -- 删除 quartz 表（python 无quartz，使用apscheduler替代）
 DROP TABLE IF EXISTS QRTZ_FIRED_TRIGGERS;
