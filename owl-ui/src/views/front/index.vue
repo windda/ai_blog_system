@@ -178,7 +178,8 @@ export default {
 .front-header { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 100; }
 .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 60px; }
 .logo h1 { margin: 0; font-size: 22px; color: #333; cursor: pointer; }
-.mobile-menu-btn { display: none; }
+.mobile-menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 4px; }
+.mobile-menu-btn span { display: block; width: 22px; height: 2px; background: #333; margin: 4px 0; }
 .nav-menu a { margin-left: 24px; color: #666; text-decoration: none; font-size: 15px; cursor: pointer; }
 .nav-menu a:hover, .nav-menu a.active { color: #1890ff; }
 .notice-bell { position: relative; cursor: pointer; }
@@ -221,5 +222,14 @@ export default {
 .notice-item.unread { background: #f0f7ff; font-weight: 500; }
 .notice-msg { font-size: 14px; color: #333; }
 .notice-time { font-size: 12px; color: #999; margin-top: 4px; }
-@media (max-width: 768px) { .category-list { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: block; }
+  .nav-menu { display: none; }
+  .nav-menu.open { display: flex; flex-direction: column; position: absolute; top: 60px; left: 0; right: 0; background: #fff; padding: 10px 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+  .nav-menu a { margin: 8px 0; }
+  .container { flex-direction: column; }
+  .sidebar { width: 100%; }
+  .article-title { font-size: 17px; }
+  .category-list { grid-template-columns: repeat(2, 1fr); }
+}
 </style>
