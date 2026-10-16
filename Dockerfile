@@ -5,13 +5,19 @@
 # 支持 Linux/Windows/macOS 跨平台部署
 # ============================================================
 
-FROM python:3.10-slim
+FROM python:3.10-slim-bookworm
 
 LABEL maintainer="shaw-lee"
 LABEL description="博客管理系统后端"
 LABEL version="2.0"
 
 WORKDIR /app
+
+# 替换 apt 源为阿里云镜像（提速；兼容 deb822 与旧 sources.list 两种格式）
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list 2>/dev/null || true
 
 # 安装系统依赖（减少层数，合并命令）
 RUN apt-get update && apt-get install -y --no-install-recommends \
