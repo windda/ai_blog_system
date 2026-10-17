@@ -120,7 +120,12 @@ def _upload_dir(*sub):
     """上传文件目录：打包环境用 exe 同目录（可写），开发环境用 profile 相对路径"""
     if getattr(sys, 'frozen', False):
         return os.path.join(os.path.dirname(sys.executable), 'uploads', *sub)
-    return os.path.join(OWLConfig.profile, *sub)
+    base = os.path.join(OWLConfig.profile, *sub)
+    # send_from_directory 对相对路径会基于 app.root_path 解析，导致与保存路径不一致，
+    # 这里统一转成绝对路径（基于 cwd，与 file.save 保存时一致）
+    if not os.path.isabs(base):
+        base = os.path.abspath(base)
+    return base
 
 
 @reg.api.route('/uploads/article/<path:filename>')
