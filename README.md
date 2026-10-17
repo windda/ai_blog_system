@@ -80,7 +80,9 @@ pyinstaller app.spec --clean
 
 ```bash
 docker compose up -d
-# 访问 http://localhost:9000
+# 前端（nginx）：http://localhost
+# 后端（Flask）：http://localhost:9000
+# 默认账号：admin / admin123
 ```
 
 ---
@@ -163,3 +165,19 @@ docker compose up -d
 2. **RBAC 权限模型**：用户 → 角色 → 菜单/按钮三级权限，`@PreAuthorize` 装饰器控制；
 3. **内存 Redis 接口兼容**：40+ 处缓存调用零改动，成本最低的去依赖方案；
 4. **BYOK 密钥隔离**：AI Key 用户自填、按用户隔离、本地存储、不打包不泄露。
+
+---
+
+## 🐳 Docker 部署踩坑记录
+
+上线过程中踩过的真实坑及解决方案：
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| 后端崩溃循环 | `requirements.txt` 缺 `requests` | 补充依赖 |
+| healthcheck 永远 unhealthy | `/health` 走动态注册流程，业务模块挂掉就中断 | `/health` 硬编码到 `app.py` 主应用 |
+| nginx 反代 502 | Flask 绑 `127.0.0.1`，容器间连不上 | Docker 环境绑 `0.0.0.0` |
+| 中文乱码 | MySQL 客户端 latin1 导入 UTF-8 数据 | SQL 开头 `SET NAMES utf8mb4` + 强制客户端 utf8mb4 |
+| 博客菜单丢失 | 菜单数据不在 SQL 里，重建后丢 | 补 `blog_menu.sql` 兜底 |
+| 封面图上传 413 | nginx 默认 `client_max_body_size=1MB` | 调至 20m |
+| 封面图预览空白 | `send_from_directory` 相对路径被 `app.root_path` 解析错 | `_upload_dir` 用绝对路径 |
