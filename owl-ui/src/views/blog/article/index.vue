@@ -194,6 +194,7 @@
                   :headers="uploadHeaders"
                   :show-file-list="false"
                   :on-success="handleCoverSuccess"
+                  :on-error="handleCoverError"
                   :before-upload="handleCoverBefore"
                 >
                   <img v-if="form.coverImage" :src="resolveImageUrl(form.coverImage)" class="cover-preview" />
@@ -362,14 +363,19 @@ export default {
     },
     handleCoverSuccess(res, file) {
       console.log("[封面图上传返回]", res);
-      if (res.code === 200) {
+      if (res && res.code === 200) {
         // 只存相对路径（如 /uploads/article/xxx.png），前端展示时统一加前缀
         this.form.coverImage = res.fileName;
         console.log("[封面图赋值]", this.form.coverImage);
         this.$message.success("封面上传成功");
       } else {
-        this.$message.error("封面上传失败: " + (res.msg || '未知错误'));
+        this.$message.error("封面上传失败: " + ((res && res.msg) || '未知错误'));
       }
+    },
+    handleCoverError(err, file, fileList) {
+      console.error("[封面图上传失败]", err, file);
+      const msg = (err && err.message) ? err.message : "网络错误或服务器异常";
+      this.$message.error("封面上传失败：" + msg);
     },
     removeCover() {
       this.form.coverImage = '';
