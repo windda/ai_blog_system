@@ -30,8 +30,31 @@ def system_user_profile():
     '''
     login_user: LoginUser = SecurityUtil.get_login_user()
     user: SysUser = login_user.user
-    return AjaxResponse.from_success(data=user) \
-        if user else AjaxResponse.from_error(msg="用户信息丢失")
+    if not user:
+        return AjaxResponse.from_error(msg="用户信息丢失")
+
+    from owl_system.service import SysRoleService, SysPostService
+    # 角色组（逗号分隔的角色名）
+    roles = SysRoleService.select_roles_by_user_id(user.user_id)
+    role_group = ','.join([
+        r.role_name for r in roles
+        if getattr(r, 'flag', False) and getattr(r, 'role_name', '')
+    ])
+    # 岗位组（逗号分隔的岗位名）
+    post_group = ''
+    post_ids = SysPostService.select_post_list_by_user_id(user.user_id)
+    if post_ids:
+        post_names = []
+        for pid in post_ids:
+            p = SysPostService.select_post_by_id(pid)
+            if p and getattr(p, 'post_name', ''):
+                post_names.append(p.post_name)
+        post_group = ','.join(post_names)
+
+    ajax_response = AjaxResponse.from_success(data=user)
+    setattr(ajax_response, "roleGroup", role_group)
+    setattr(ajax_response, "postGroup", post_group)
+    return ajax_response
 
 
 @reg.api.route("/system/user/profile", methods=["PUT"])
