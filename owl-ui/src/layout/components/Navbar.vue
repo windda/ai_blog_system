@@ -17,13 +17,6 @@
           </span>
         </el-tooltip>
 
-        <!-- 前台博客入口 -->
-        <el-tooltip content="前台博客" effect="dark" placement="bottom">
-          <span class="right-menu-item hover-effect front-blog-btn" @click="goFront">
-            <svg-icon icon-class="guide" />
-          </span>
-        </el-tooltip>
-
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
 
         <!-- 站内通知 -->
@@ -39,6 +32,13 @@
         </el-tooltip>
 
       </template>
+
+      <!-- 前台博客入口（移动端也显示，方便跳转前台） -->
+      <el-tooltip content="前台博客" effect="dark" placement="bottom">
+        <span class="right-menu-item hover-effect front-blog-btn" @click="goFront">
+          <svg-icon icon-class="guide" />
+        </span>
+      </el-tooltip>
 
       <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
         <div class="avatar-wrapper">
