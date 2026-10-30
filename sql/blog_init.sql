@@ -173,6 +173,9 @@ CREATE TABLE IF NOT EXISTS `ai_token_record` (
   `prompt_tokens` int DEFAULT NULL COMMENT '提示Token数',
   `completion_tokens` int DEFAULT NULL COMMENT '回复Token数',
   `total_tokens` int DEFAULT NULL COMMENT '总Token数',
+  `ai_type` varchar(32) COLLATE utf8mb4_general_ci DEFAULT 'llm' COMMENT '能力类型：llm / asr',
+  `input_tokens` int DEFAULT 0 COMMENT '输入token数',
+  `output_tokens` int DEFAULT 0 COMMENT '输出token数',
   `model` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '模型名称',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)

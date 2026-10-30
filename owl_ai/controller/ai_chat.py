@@ -84,6 +84,54 @@ def ai_config_clear():
     return AjaxResponse.from_success(msg="已清除") if ok else AjaxResponse.from_error(msg="清除失败")
 
 
+# ============================================================
+# 统一 AI 调用接口（ai_type 路由到 LLM / ASR）
+#
+# 设计说明：
+#   本接口是所有 AI 能力的统一入口，前端/其他服务只对接这一个接口，
+#   通过 ai_type 参数自动路由到对应能力，新增能力无需前端改接口。
+# ============================================================
+
+@reg.api.route("/ai/unified", methods=["POST"])
+@JsonSerializer()
+def ai_unified():
+    """
+    统一 AI 调用接口。
+
+    - JSON 请求（ai_type=llm）：body 携带 messages
+    - multipart 请求（ai_type=asr）：上传音频文件（file 字段）
+
+    返回：{'ai_type', 'reply'/'text', 'usage', 'elapsed_ms'}
+    """
+    user_id = SecurityUtil.get_user_id()
+    from owl_ai.util.llm_client import AIGatewayClient, AICallError
+
+    # JSON 请求 → LLM 文本
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        ai_type = (data.get('aiType') or data.get('ai_type') or '').strip()
+        if ai_type != 'llm':
+            return AjaxResponse.from_error(msg=f"JSON 请求仅支持 ai_type=llm，收到：{ai_type or '空'}")
+        try:
+            result = AIGatewayClient.call('llm', user_id=user_id, messages=data.get('messages'))
+            return AjaxResponse.from_success(data=result)
+        except AICallError as e:
+            return AjaxResponse.from_error(msg=e.message)
+
+    # multipart 请求 → ASR 语音转写
+    ai_type = (request.form.get('aiType') or request.form.get('ai_type') or 'asr').strip()
+    if ai_type != 'asr':
+        return AjaxResponse.from_error(msg=f"multipart 请求仅支持 ai_type=asr，收到：{ai_type or '空'}")
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        return AjaxResponse.from_error(msg="缺少音频文件（file 字段）")
+    try:
+        result = AIGatewayClient.call('asr', user_id=user_id, audio_bytes=file.read())
+        return AjaxResponse.from_success(data=result)
+    except AICallError as e:
+        return AjaxResponse.from_error(msg=e.message)
+
+
 @reg.api.route("/ai/chat/history", methods=["GET"])
 @JsonSerializer()
 def ai_chat_history():

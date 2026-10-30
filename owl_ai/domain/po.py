@@ -40,13 +40,18 @@ class BowlAiMessage(db.Model):
 
 class AiTokenRecordPo(db.Model):
     __tablename__ = 'ai_token_record'
-    __table_args__ = {'comment': 'AI Token 消耗统计表'}
+    __table_args__ = {'comment': 'AI 调用日志表（统一调度网关记录 LLM / ASR 调用）'}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, comment='用户ID')
     session_id: Mapped[Optional[int]] = mapped_column(Integer, comment='会话ID')
+    # 能力类型：llm=文本大模型 / asr=语音转写（预留：后续边缘设备、具身智能可扩展新类型）
+    ai_type: Mapped[Optional[str]] = mapped_column(String(32), default='llm', comment='能力类型：llm / asr')
     prompt_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='提示Token数')
     completion_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='回复Token数')
     total_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='总Token数')
+    # 通用输入/输出 Token（ASR 等非对话类能力用，LLM 场景与 prompt/completion 对应）
+    input_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输入token数')
+    output_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输出token数')
     model: Mapped[Optional[str]] = mapped_column(String(50), default='deepseek-chat', comment='模型名称')
     create_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, server_default=text('CURRENT_TIMESTAMP'))

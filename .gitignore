@@ -76,5 +76,8 @@ instance/
 # AI 用户配置（含用户自己的 Key）
 ai_config.json
 
+# AI 统一调度网关配置（可能含服务商地址，禁止进 git）
+config.yaml
+
 # 迁移脚本产生的临时文件
 sql/_tmp_restore.sql
