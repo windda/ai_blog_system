@@ -73,7 +73,7 @@ def _migrate_sqlite():
     """SQLite 场景：给已存在的表补齐缺失字段（幂等，兼容历史库）。
 
     说明：db.create_all() 只建新表、不给已有表加列，所以这里手动 ALTER TABLE
-    补齐历史版本缺失的 ai_type / input_tokens / output_tokens 等字段。
+    补齐历史版本缺失的字段。
     """
     from owl_admin.ext import db as _db
     try:
@@ -86,17 +86,23 @@ def _migrate_sqlite():
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         try:
-            cur.execute("PRAGMA table_info(ai_token_record)")
-            cols = [row[1] for row in cur.fetchall()]
-            adds = [
-                ('ai_type', "ALTER TABLE ai_token_record ADD COLUMN ai_type VARCHAR(32) DEFAULT 'llm'"),
-                ('input_tokens', "ALTER TABLE ai_token_record ADD COLUMN input_tokens INTEGER DEFAULT 0"),
-                ('output_tokens', "ALTER TABLE ai_token_record ADD COLUMN output_tokens INTEGER DEFAULT 0"),
+            migrations = [
+                # (表名, 字段名, DDL)
+                ('ai_token_record', 'ai_type', "ALTER TABLE ai_token_record ADD COLUMN ai_type VARCHAR(32) DEFAULT 'llm'"),
+                ('ai_token_record', 'input_tokens', "ALTER TABLE ai_token_record ADD COLUMN input_tokens INTEGER DEFAULT 0"),
+                ('ai_token_record', 'output_tokens', "ALTER TABLE ai_token_record ADD COLUMN output_tokens INTEGER DEFAULT 0"),
+                ('ai_token_record', 'statistics_source', "ALTER TABLE ai_token_record ADD COLUMN statistics_source VARCHAR(32) DEFAULT 'api'"),
+                ('ai_provider_call_log', 'user_id', "ALTER TABLE ai_provider_call_log ADD COLUMN user_id INTEGER"),
             ]
-            for name, ddl in adds:
-                if name not in cols:
+            for table, col, ddl in migrations:
+                try:
+                    cur.execute(f"PRAGMA table_info({table})")
+                    cols = [row[1] for row in cur.fetchall()]
+                except Exception:
+                    continue  # 表不存在则跳过（create_all 会建全字段的表）
+                if col not in cols:
                     cur.execute(ddl)
-                    print(f"[迁移] ai_token_record 已补字段：{name}")
+                    print(f"[迁移] {table} 已补字段：{col}")
             conn.commit()
         finally:
             conn.close()

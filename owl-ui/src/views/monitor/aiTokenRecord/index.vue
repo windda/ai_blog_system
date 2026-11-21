@@ -51,8 +51,14 @@
     <el-card style="margin-bottom:16px;">
       <div slot="header" style="font-weight:600;">Token 监控报表</div>
       <el-row :gutter="20">
-        <el-col :span="14"><div ref="trendChart" style="height:300px;"></div></el-col>
-        <el-col :span="10"><div ref="modelChart" style="height:300px;"></div></el-col>
+        <el-col :span="14">
+          <div v-if="chartData.dailyTrend && chartData.dailyTrend.length" ref="trendChart" style="height:300px;"></div>
+          <el-empty v-else description="暂无数据" :image-size="60" style="height:300px;"></el-empty>
+        </el-col>
+        <el-col :span="10">
+          <div v-if="chartData.modelUsage && chartData.modelUsage.length" ref="modelChart" style="height:300px;"></div>
+          <el-empty v-else description="暂无数据" :image-size="60" style="height:300px;"></el-empty>
+        </el-col>
       </el-row>
     </el-card>
 

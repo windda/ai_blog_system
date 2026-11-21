@@ -18,6 +18,7 @@ from owl_common.base.model import AjaxResponse, TableResponse
 from owl_common.descriptor.serializer import JsonSerializer
 from sqlalchemy import select, func
 from datetime import datetime, timedelta, timezone
+import traceback
 
 # 东八区时区（Asia/Shanghai，中国无夏令时，固定 UTC+8）
 CST_TZ = timezone(timedelta(hours=8), "Asia/Shanghai")
@@ -817,7 +818,11 @@ def admin_ai_token_summary():
             "totalTokens": int(total_row[1] or 0) if total_row else 0
         })
     except Exception:
-        return AjaxResponse.from_error(msg="查询失败，请稍后重试")
+        traceback.print_exc()
+        return AjaxResponse.from_success(data={
+            "dailyCalls": 0, "dailyTokens": 0, "dailyPromptTokens": 0,
+            "dailyCompletionTokens": 0, "totalCalls": 0, "totalTokens": 0,
+        })
 
 
 @reg.api.route("/admin/ai/provider-success-rate", methods=["GET"])
@@ -852,7 +857,8 @@ def admin_ai_provider_success_rate():
             })
         return AjaxResponse.from_success(data=data)
     except Exception:
-        return AjaxResponse.from_error(msg="查询失败，请稍后重试")
+        traceback.print_exc()
+        return AjaxResponse.from_success(data=[])
 
 
 @reg.api.route("/admin/ai/platform-key", methods=["GET"])
@@ -955,7 +961,8 @@ def admin_ai_token_chart():
         model_usage = [{"model": r[0] or 'unknown', "count": int(r[1] or 0), "tokens": int(r[2] or 0)} for r in db.session.execute(model_stmt).all()]
         return AjaxResponse.from_success(data={"dailyTrend": daily_trend, "modelUsage": model_usage})
     except Exception:
-        return AjaxResponse.from_error(msg="查询失败，请稍后重试")
+        traceback.print_exc()
+        return AjaxResponse.from_success(data={"dailyTrend": [], "modelUsage": []})
 
 
 @reg.api.route("/admin/ai/call-logs", methods=["GET"])
@@ -1002,7 +1009,8 @@ def admin_ai_call_logs():
         } for r in rows]
         return TableResponse(rows=records, total=total)
     except Exception:
-        return AjaxResponse.from_error(msg="查询失败，请稍后重试")
+        traceback.print_exc()
+        return TableResponse(rows=[], total=0)
 
 
 @reg.api.route("/admin/ai/platform-key-alert", methods=["GET"])
@@ -1028,7 +1036,8 @@ def admin_ai_platform_key_alert():
             "reason": f"平台 Key 最近 24 小时出现 {int(fail_count)} 次鉴权/余额不足失败，请检查额度或更换 Key" if alert else '',
         })
     except Exception:
-        return AjaxResponse.from_error(msg="查询失败，请稍后重试")
+        traceback.print_exc()
+        return AjaxResponse.from_success(data={"alert": False, "failCount": 0, "reason": ""})
 
 
 # ==================== SocketIO ====================
