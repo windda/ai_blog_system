@@ -36,7 +36,7 @@ class RouterVo(BaseModel):
     component: Optional[str] = None
     
     # 是否隐藏路由（0显示 1隐藏） 
-    hidden: Optional[str] = None
+    hidden: Optional[bool] = None
     
     # 重定向地址 
     redirect: Optional[str] = None

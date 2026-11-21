@@ -45,13 +45,30 @@ class AiTokenRecordPo(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, comment='用户ID')
     session_id: Mapped[Optional[int]] = mapped_column(Integer, comment='会话ID')
-    # 能力类型：llm=文本大模型 / asr=语音转写（预留：后续边缘设备、具身智能可扩展新类型）
     ai_type: Mapped[Optional[str]] = mapped_column(String(32), default='llm', comment='能力类型：llm / asr')
     prompt_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='提示Token数')
     completion_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='回复Token数')
     total_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='总Token数')
-    # 通用输入/输出 Token（ASR 等非对话类能力用，LLM 场景与 prompt/completion 对应）
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输入token数')
     output_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输出token数')
     model: Mapped[Optional[str]] = mapped_column(String(50), default='deepseek-chat', comment='模型名称')
+    statistics_source: Mapped[Optional[str]] = mapped_column(String(32), default='api', comment='统计来源：api / local_estimate')
+    create_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
+
+
+class AiProviderCallLogPo(db.Model):
+    """AI 服务商调用日志表（容灾切换 + 成功率统计）"""
+
+    __tablename__ = 'ai_provider_call_log'
+    __table_args__ = {'comment': 'AI 服务商调用日志表'}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, comment='用户ID')
+    provider: Mapped[Optional[str]] = mapped_column(String(50), default='', comment='服务商名称')
+    model: Mapped[Optional[str]] = mapped_column(String(50), default='', comment='模型名称')
+    ai_type: Mapped[Optional[str]] = mapped_column(String(32), default='llm', comment='能力类型：llm / asr')
+    success: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='是否成功：1成功 0失败')
+    error_category: Mapped[Optional[str]] = mapped_column(String(32), default='', comment='失败原因分类：timeout/429/500/auth/network/http_xxx/exception')
+    error_message: Mapped[Optional[str]] = mapped_column(String(500), default='', comment='失败详情')
+    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='耗时（毫秒）')
     create_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, server_default=text('CURRENT_TIMESTAMP'))

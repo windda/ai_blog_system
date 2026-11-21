@@ -181,6 +181,138 @@ class AIGatewayClient:
         }
 
     # ============================================================
+    # LLM 流式能力（SSE 逐 token 推送，打字机效果）
+    # ============================================================
+    @classmethod
+    def stream_llm(cls, user_id, messages, on_token, on_done=None, on_error=None,
+                   session_id=None, temperature=0.7, max_tokens=4096):
+        """
+        流式 LLM 调用：逐 token 回调，模拟打字机效果。
+
+        Args:
+            user_id: 用户 ID
+            messages: 消息上下文
+            on_token: 每收到一个 token 调用一次（入参：token 字符串）
+            on_done:  完成回调（入参：完整回复文本、usage dict）
+            on_error: 错误回调（入参：错误消息字符串）
+            session_id: 会话 ID（日志记录用）
+            temperature / max_tokens: 生成参数
+
+        说明：
+            - 请求体带 stream_options.include_usage=True，流式最后一帧会返回 usage，
+              因此流式模式同样能采集 input_tokens/output_tokens 并入库。
+            - 异常处理与 _call_llm 一致（超时/429/401/403 分类）。
+        """
+        cfg = get_provider_config('llm')
+        api_key = os.environ.get(cfg.get('api_key_env', ''), '')
+
+        if not api_key:
+            if on_error:
+                on_error("LLM API Key 未配置")
+            return
+
+        base_url = cfg.get('base_url', '').rstrip('/')
+        model = cfg.get('model', 'deepseek-chat')
+        timeout = int(cfg.get('timeout', 30))
+
+        url = f"{base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        body = {
+            "model": model,
+            "messages": messages,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        full_reply = []
+        usage = {}
+
+        try:
+            resp = requests.post(url, headers=headers, json=body, stream=True, timeout=timeout)
+
+            if resp.status_code == 429:
+                logger.warning("[AI网关] 流式 429 限流告警")
+                if on_error:
+                    on_error("请求过于频繁（429），请稍后再试")
+                return
+            if resp.status_code in (401, 403):
+                if on_error:
+                    on_error(f"鉴权失败（{resp.status_code}），请检查 API Key")
+                return
+            if resp.status_code != 200:
+                if on_error:
+                    on_error(f"AI 服务返回错误（{resp.status_code}）")
+                return
+
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                line_text = line.decode('utf-8', errors='ignore')
+                if not line_text.startswith('data:'):
+                    continue
+                data_str = line_text[5:].strip()
+                if data_str == '[DONE]':
+                    break
+                try:
+                    data = json.loads(data_str)
+                except Exception:  # noqa: BLE001
+                    continue
+
+                # 最后一帧的 usage（stream_options.include_usage=True 时）
+                if data.get('usage'):
+                    usage = data['usage']
+
+                choices = data.get('choices') or []
+                if not choices:
+                    continue
+                delta = choices[0].get('delta', {}) or {}
+                content = delta.get('content', '')
+                if content:
+                    full_reply.append(content)
+                    on_token(content)
+
+        except requests.exceptions.Timeout:
+            if on_error:
+                on_error("请求超时，请稍后重试")
+            return
+        except requests.exceptions.ConnectionError:
+            if on_error:
+                on_error("网络连接失败，请检查网络后重试")
+            return
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[AI网关] 流式调用异常：%s", e)
+            if on_error:
+                on_error(f"AI 服务调用异常（{type(e).__name__}）：{e}")
+            return
+
+        # 采集 usage 并入库（流式同样记录 token 消耗）
+        input_tokens = usage.get('prompt_tokens', 0) or 0
+        output_tokens = usage.get('completion_tokens', 0) or 0
+        total_tokens = usage.get('total_tokens', input_tokens + output_tokens)
+        if total_tokens == 0:
+            output_tokens = max(1, sum(len(t) for t in full_reply) // 4)
+
+        cls._log_call(
+            user_id=user_id, session_id=session_id, ai_type='llm', model=model,
+            prompt_tokens=input_tokens, completion_tokens=output_tokens,
+            total_tokens=total_tokens, input_tokens=input_tokens, output_tokens=output_tokens,
+        )
+
+        reply = ''.join(full_reply)
+        if on_done:
+            on_done(reply, {
+                'input_tokens': input_tokens,
+                'output_tokens': output_tokens,
+                'total_tokens': total_tokens,
+            })
+
+    # ============================================================
     # ASR 语音转写能力
     # ============================================================
     @classmethod

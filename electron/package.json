@@ -1,0 +1,49 @@
+{
+  "name": "ai-blog-system",
+  "version": "1.0.0",
+  "description": "AI 对话后台 —— 多模型 Token 聚合网关 + 双密钥模式 + ASR 语音输入",
+  "main": "main.js",
+  "author": "AI Blog System",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis --x64"
+  },
+  "build": {
+    "appId": "com.aiblog.system",
+    "productName": "AI对话后台",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "../owl-ui/dist", "to": "owl-ui/dist" },
+      { "from": "../owl_admin", "to": "owl_admin" },
+      { "from": "../owl_ai", "to": "owl_ai" },
+      { "from": "../owl_blog", "to": "owl_blog" },
+      { "from": "../owl_common", "to": "owl_common" },
+      { "from": "../owl_system", "to": "owl_system" },
+      { "from": "../run.py", "to": "run.py" },
+      { "from": "../requirements.txt", "to": "requirements.txt" },
+      { "from": "../config.yaml", "to": "config.yaml" }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

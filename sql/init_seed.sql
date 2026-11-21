@@ -93,3 +93,19 @@ ON DUPLICATE KEY UPDATE content=VALUES(content);
 -- ============================================================
 -- MySQL 5.6+ InnoDB 支持 FULLTEXT，中文需 ngram parser（5.7.6+）
 -- 不使用 FULLTEXT 时，当前 LIKE 查询在 10万条以内性能可接受
+
+-- ============================================================
+-- 7. AI 网关配置（sys_config 种子）
+-- ============================================================
+-- 平台 Key 兜底开关：默认开启，管理员可在后台「系统管理 -> 参数设置」切换
+--   true  ：用户未填写自有 Key 时，允许降级使用平台全局 Key
+--   false ：用户未填写自有 Key 时，直接拦截并提示绑定自己的 Key
+INSERT INTO sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+SELECT 'AI网关-平台Key兜底开关', 'enable_platform_key_fallback', 'true', 'Y', 'admin', NOW(), '是否允许用户未填写自有Key时降级使用平台全局Key（true开启/false关闭，默认开启）'
+WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'enable_platform_key_fallback');
+
+-- 说明：平台全局 Key（ai.platform.api.key）与每日 Token 限额（ai.daily.token.limit）
+--       均可由管理员在后台「参数设置」手动新增；未配置时走代码默认值：
+--       平台 Key 兜底环境变量 DEEPSEEK_API_KEY；
+--       每日限额按角色：普通用户 10000 token、管理员 50000 token。
+

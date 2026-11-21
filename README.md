@@ -54,6 +54,47 @@
 
 ---
 
+## 🤖 多模型 Token 聚合网关（面试重点）
+
+### 一、双密钥模式（对应 JD：Token 聚合平台）
+
+| 模式 | 说明 | 存储 |
+|------|------|------|
+| 模式 A：平台全局 Key | 管理员后台统一配置，所有用户共用 | sys_config（`ai.platform.api.key`）|
+| 模式 B：用户自有 Key | 用户在个人中心填写自己的模型密钥 | ai_config.json（对称加密，禁止明文入库）|
+
+- **优先级**：用户自有 Key → 平台全局 Key → 环境变量兜底；
+- **两层限额**：
+  1. 厂商侧余额：DeepSeek / 混元等厂商自己管控，网关只捕获报错（401/403/429）分类返回前端；
+  2. 平台侧限额：每个用户独立单日 Token 上限（软防护），不管走哪个 Key 都生效，保护服务不被打垮；
+- 用户个人用量面板：只能查看自己的对话记录、token 消耗明细；管理员不变，查看全量记录。
+
+### 二、多厂商容灾 + 故障切换
+
+- 支持 DeepSeek / 腾讯混元 / 文心一言，统一请求封装（OpenAI 兼容协议）；
+- 失败自动重试 + 降级切换备用模型（超时 / 500 自动切下一个供应商）；
+- 异常分类：超时 / 限流 / 鉴权 / 解析失败，统一返回结构。
+
+### 三、Token 统计 + 用量面板
+
+- 每次 LLM / ASR 调用自动入库 `ai_token_record`，区分 `api` / `local_estimate` 统计来源；
+- 用户用量面板：`/ai/daily-usage`（汇总）+ `/ai/my-token-records`（个人明细）；
+- 管理员后台：`/admin/ai/token-records`（全量）+ `/admin/ai/token-summary`（汇总）。
+
+### 四、ASR 语音输入（轻量版）
+
+- 前端浏览器麦克风录音（MediaRecorder，audio/webm）→ 上传后端 `/ai/asr`；
+- 后端调用第三方云 ASR（OpenAI whisper，可切火山/讯飞）转文字；
+- 识别结果自动填充输入框，发送给大模型，同样走 token 统计入库。
+
+### 五、Electron 打包方案
+
+- `electron/main.js`：主进程 spawn 启动 Flask 后端 + 加载 Vue 打包产物；
+- `electron/package.json`：electron-builder 配置，`npm run build:win` 打包 Windows x64 安装包（NSIS）；
+- 完整打包流程注释见 `electron/main.js` 顶部（面试重点讲，不纠结打包调试）。
+
+---
+
 ## 🚀 快速启动
 
 ### 方式一：本地开发（MySQL + Redis）
@@ -128,14 +169,16 @@ docker compose up -d
 ```
 ├── owl_admin/              # Flask 应用核心（app.py、ext.py、controller）
 ├── owl_blog/               # 博客业务（文章/评论/分类/标签/仪表盘）
-├── owl_ai/                 # AI 对话（BYOK 配置、DeepSeek 客户端）
+├── owl_ai/                 # AI 网关（多模型调度、双密钥、ASR、Token 统计）
 ├── owl_common/             # 公共基础库（内存 Redis、异常、模型）
 ├── owl_framework/          # 框架支撑（权限、Token）
 ├── owl_system/             # 系统管理（用户/角色/菜单）
-├── owl-ui/                 # Vue 前端
+├── owl-ui/                 # Vue 前端（含 AI 对话、录音、用量面板）
+├── electron/               # Electron 打包（main.js + electron-builder 配置）
 ├── run.py                  # 打包入口
 ├── app.spec                # PyInstaller 打包配置
 ├── installer.iss           # Inno Setup 安装包脚本
+├── config.yaml             # AI 服务商/ASR 配置（多供应商、超时重试）
 ├── migrate_to_sqlite.py    # MySQL → SQLite 数据迁移脚本
 └── docker-compose.yml      # Docker 编排
 ```
@@ -152,8 +195,15 @@ docker compose up -d
 | GET /blog/dashboard | 后台仪表盘 | 登录 |
 | POST /blog/article | 新增文章 | blog:article:add |
 | POST /comment | 发表评论 | 无 |
-| POST /ai/chat | AI 对话 | 登录 |
-| GET /ai/config | AI 配置状态 | 登录 |
+| POST /ai/chat | AI 对话（HTTP）| 登录 |
+| POST /ai/chat/stream | AI 对话（SSE 流式）| 登录 |
+| GET /ai/providers | 启用的供应商+模型列表 | 登录 |
+| GET /ai/config | AI 配置状态（打码）| 登录 |
+| GET /ai/daily-usage | 个人用量汇总（今日/累计/限额）| 登录 |
+| GET /ai/my-token-records | 个人 token 消耗明细 | 登录 |
+| POST /ai/asr | ASR 语音转文字 | 登录 |
+| GET /admin/ai/token-records | 全量 token 记录 | 管理员 |
+| GET /admin/ai/token-summary | token 汇总统计 | 管理员 |
 | POST /common/upload | 图片上传 | 登录 |
 | GET /uploads/article/{filename} | 图片访问 | 无 |
 

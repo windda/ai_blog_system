@@ -69,6 +69,41 @@ def _init_upload_files():
         shutil.copytree(src, dst)
 
 
+def _migrate_sqlite():
+    """SQLite 场景：给已存在的表补齐缺失字段（幂等，兼容历史库）。
+
+    说明：db.create_all() 只建新表、不给已有表加列，所以这里手动 ALTER TABLE
+    补齐历史版本缺失的 ai_type / input_tokens / output_tokens 等字段。
+    """
+    from owl_admin.ext import db as _db
+    try:
+        if _db.engine.dialect.name != 'sqlite':
+            return
+        db_path = _db.engine.url.database
+        if not db_path or not os.path.exists(db_path):
+            return
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        try:
+            cur.execute("PRAGMA table_info(ai_token_record)")
+            cols = [row[1] for row in cur.fetchall()]
+            adds = [
+                ('ai_type', "ALTER TABLE ai_token_record ADD COLUMN ai_type VARCHAR(32) DEFAULT 'llm'"),
+                ('input_tokens', "ALTER TABLE ai_token_record ADD COLUMN input_tokens INTEGER DEFAULT 0"),
+                ('output_tokens', "ALTER TABLE ai_token_record ADD COLUMN output_tokens INTEGER DEFAULT 0"),
+            ]
+            for name, ddl in adds:
+                if name not in cols:
+                    cur.execute(ddl)
+                    print(f"[迁移] ai_token_record 已补字段：{name}")
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"[迁移] SQLite 迁移跳过：{e}")
+
+
 def create_app() -> Flask:
     """
     创建flask应用
@@ -97,9 +132,10 @@ def create_app() -> Flask:
     lm.init_app(app)
     socketio.init_app(app)
 
-    # SQLite 场景：自动建表（幂等，已存在的表会跳过）
+    # SQLite 场景：自动建表（幂等，已存在的表会跳过）+ 补齐历史缺失字段
     with app.app_context():
         db.create_all()
+        _migrate_sqlite()
 
     # ============================================================
     # 全局统一异常处理

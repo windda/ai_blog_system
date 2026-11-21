@@ -10,9 +10,52 @@ import os
 import sys
 import json
 import re
+import base64
+import hashlib
 
 DEFAULT_MODEL = 'deepseek-chat'
 SUPPORTED_MODELS = ['deepseek-chat', 'deepseek-reasoner', 'deepseek-flash', 'deepseek-v4-flash', 'deepseek-coder']
+
+# 加密密钥（对称加密，生产环境建议从环境变量 ENC_SECRET 读取）
+_ENCRYPT_SECRET = os.environ.get('AI_KEY_ENC_SECRET', 'ai-blog-system-local-secret-2026')
+
+
+def _derive_key() -> bytes:
+    """从密钥派生 32 字节加密 key"""
+    return hashlib.sha256(_ENCRYPT_SECRET.encode('utf-8')).digest()
+
+
+def _encrypt(plaintext: str) -> str:
+    """对称加密（XOR + SHA256 派生 key + base64），禁止明文入库"""
+    if not plaintext:
+        return ''
+    key = _derive_key()
+    data = plaintext.encode('utf-8')
+    encrypted = bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+    return base64.urlsafe_b64encode(encrypted).decode('ascii')
+
+
+def _decrypt(ciphertext: str) -> str:
+    """解密"""
+    if not ciphertext:
+        return ''
+    try:
+        key = _derive_key()
+        data = base64.urlsafe_b64decode(ciphertext.encode('ascii'))
+        decrypted = bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+        return decrypted.decode('utf-8')
+    except Exception:
+        return ''
+
+
+def encrypt_text(plaintext: str) -> str:
+    """加密文本（供平台全局 Key 等场景复用）"""
+    return _encrypt(plaintext)
+
+
+def decrypt_text(ciphertext: str) -> str:
+    """解密文本"""
+    return _decrypt(ciphertext)
 
 
 def _config_path() -> str:
@@ -45,8 +88,14 @@ def _save(data: dict) -> bool:
 
 
 def get_api_key(user_id) -> str:
-    """读取指定用户的 API Key，未配置返回空字符串"""
-    return (_user_cfg(user_id).get('deepseek_api_key') or '').strip()
+    """读取指定用户的 API Key（加密存储，读取时解密）"""
+    stored = (_user_cfg(user_id).get('deepseek_api_key') or '').strip()
+    if not stored:
+        return ''
+    # 兼容旧数据：明文 sk- 开头直接返回；否则是密文，解密
+    if stored.startswith('sk-'):
+        return stored
+    return _decrypt(stored).strip()
 
 
 def get_model(user_id) -> str:
@@ -61,7 +110,7 @@ def save_config(user_id, api_key: str, model: str = DEFAULT_MODEL) -> bool:
     uid = str(user_id)
     user_cfg = data.get(uid, {})
     if api_key and api_key.strip():
-        user_cfg['deepseek_api_key'] = api_key.strip()
+        user_cfg['deepseek_api_key'] = _encrypt(api_key.strip())  # 加密存储，禁止明文入库
     user_cfg['model'] = model.strip() if (model or '').strip() in SUPPORTED_MODELS else DEFAULT_MODEL
     data[uid] = user_cfg
     return _save(data)
@@ -91,5 +140,9 @@ def mask_key(key: str) -> str:
 
 
 def is_valid_key(key: str) -> bool:
-    """校验 API Key 格式：sk- 开头 + 字母数字/横线/下划线"""
-    return bool(key) and bool(re.fullmatch(r'sk-[A-Za-z0-9\-_]+', key))
+    """校验 API Key 格式合法性（不限制 sk- 前缀，兼容各模型厂商 Key 格式）
+
+    只做基础合法性判断：非空 + 不含空白字符。
+    """
+    key = (key or '').strip()
+    return bool(key) and not any(c.isspace() for c in key)
