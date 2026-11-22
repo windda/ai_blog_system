@@ -32,10 +32,15 @@ const path = require('path')
 
 let backendProcess = null
 
+// 打包环境：extraResources 复制到 resources/ 目录；开发环境：electron 目录的上级（项目根）
+const isPackaged = app.isPackaged
+const resourcesRoot = isPackaged ? process.resourcesPath : path.join(__dirname, '..')
+
 // 启动 Flask 后端
 function startBackend() {
-  // 开发阶段：直接 spawn python run.py；打包阶段：改用打包进 resources 的 ai_backend.exe
-  const backendDir = path.join(__dirname, '..') // 项目根目录
+  // 开发：spawn 项目根目录的 python run.py；打包：spawn resources/ 下的 run.py
+  // 说明：后端依赖完整 Python 环境，生产打包建议用 PyInstaller 把 run.py 打成 exe 再 spawn
+  const backendDir = resourcesRoot
   const pythonExecutable = process.env.PYTHON_EXECUTABLE || 'python'
   backendProcess = spawn(pythonExecutable, ['run.py'], {
     cwd: backendDir,
@@ -59,8 +64,8 @@ function createWindow() {
     }
   })
 
-  // 生产：加载打包进 resources 的 owl-ui/dist/index.html
-  win.loadFile(path.join(__dirname, '..', 'owl-ui', 'dist', 'index.html'))
+  // 前端产物：打包后从 resources/owl-ui/dist 加载；开发环境从项目根目录加载
+  win.loadFile(path.join(resourcesRoot, 'owl-ui', 'dist', 'index.html'))
 
   // 开发：加载 Vue dev server（取消下面注释即可）
   // win.loadURL('http://localhost:8080')

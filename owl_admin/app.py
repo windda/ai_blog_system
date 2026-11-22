@@ -92,6 +92,7 @@ def _migrate_sqlite():
                 ('ai_token_record', 'input_tokens', "ALTER TABLE ai_token_record ADD COLUMN input_tokens INTEGER DEFAULT 0"),
                 ('ai_token_record', 'output_tokens', "ALTER TABLE ai_token_record ADD COLUMN output_tokens INTEGER DEFAULT 0"),
                 ('ai_token_record', 'statistics_source', "ALTER TABLE ai_token_record ADD COLUMN statistics_source VARCHAR(32) DEFAULT 'api'"),
+                ('ai_token_record', 'cost', "ALTER TABLE ai_token_record ADD COLUMN cost FLOAT DEFAULT 0"),
                 ('ai_provider_call_log', 'user_id', "ALTER TABLE ai_provider_call_log ADD COLUMN user_id INTEGER"),
             ]
             for table, col, ddl in migrations:
@@ -103,6 +104,22 @@ def _migrate_sqlite():
                 if col not in cols:
                     cur.execute(ddl)
                     print(f"[迁移] {table} 已补字段：{col}")
+
+            # 模型单价种子（SQLite 版不跑 init_seed.sql 的 MySQL 语法，这里幂等插入）
+            try:
+                cur.execute("PRAGMA table_info(ai_model_price)")
+                if cur.fetchall():
+                    cur.executemany(
+                        "INSERT OR IGNORE INTO ai_model_price (model, provider, input_price, output_price) VALUES (?, ?, ?, ?)",
+                        [
+                            ('deepseek-chat', 'deepseek', 0.27, 1.10),
+                            ('deepseek-reasoner', 'deepseek', 0.55, 2.19),
+                            ('hunyuan-lite', 'hunyuan', 0.0, 0.0),
+                            ('hunyuan-standard', 'hunyuan', 0.50, 1.0),
+                        ]
+                    )
+            except Exception:
+                pass  # 表不存在则跳过
             conn.commit()
         finally:
             conn.close()

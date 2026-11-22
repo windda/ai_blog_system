@@ -439,7 +439,21 @@ class AIGatewayClient:
         """统一日志记录：写入 ai_token_record（失败不影响主流程）"""
         try:
             from owl_admin.ext import db
-            from owl_ai.domain.po import AiTokenRecordPo
+            from owl_ai.domain.po import AiTokenRecordPo, AiModelPricePo
+            from sqlalchemy import select as _select
+            # 计费：根据模型单价计算本次调用费用（元）
+            cost = 0.0
+            try:
+                price = db.session.execute(
+                    _select(AiModelPricePo).where(AiModelPricePo.model == model)
+                ).scalar_one_or_none()
+                if price:
+                    cost = round(
+                        (prompt_tokens or 0) * (price.input_price or 0) / 1000000.0 +
+                        (completion_tokens or 0) * (price.output_price or 0) / 1000000.0, 6
+                    )
+            except Exception:
+                pass
             record = AiTokenRecordPo(
                 user_id=user_id or 0,
                 session_id=session_id,
@@ -450,6 +464,7 @@ class AIGatewayClient:
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 model=model,
+                cost=cost,
             )
             db.session.add(record)
             db.session.commit()

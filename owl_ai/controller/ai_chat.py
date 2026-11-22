@@ -40,6 +40,26 @@ def _estimate_tokens(text):
         return max(1, len(text) // 4)
 
 
+def _calc_cost(model, prompt_tokens, completion_tokens):
+    """根据模型单价计算费用（元）。
+
+    公式：费用 = (输入token × 输入单价 + 输出token × 输出单价) / 100万
+    单价来自 ai_model_price 表（单位：元/百万token），未配置的模型按 0 计费。
+    """
+    try:
+        from owl_ai.domain.po import AiModelPricePo
+        price = db.session.execute(
+            select(AiModelPricePo).where(AiModelPricePo.model == model)
+        ).scalar_one_or_none()
+        if not price:
+            return 0.0
+        input_cost = (prompt_tokens or 0) * (price.input_price or 0) / 1000000.0
+        output_cost = (completion_tokens or 0) * (price.output_price or 0) / 1000000.0
+        return round(input_cost + output_cost, 6)
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
 def _get_daily_token_limit(user_id=None):
     """获取每日 Token 限额（后端服务防护限流，独立于厂商额度）
 
@@ -105,6 +125,23 @@ def _platform_key_fallback_enabled():
     except Exception:  # noqa: BLE001
         pass
     return True  # 默认开启
+
+
+def _asr_enabled():
+    """ASR 语音识别开关（后台 sys_config 配置，默认关闭）
+
+    开关 ai.asr.enabled（后台 sys_config）：
+        - 开启：前端显示录音按钮，/ai/asr 可用
+        - 关闭：前端隐藏按钮，/ai/asr 返回友好提示
+    """
+    try:
+        from owl_system.service import SysConfigService
+        value = SysConfigService.select_config_by_key("ai.asr.enabled")
+        if value is not None and value != '':
+            return value.strip().lower() in ('true', '1', 'yes', 'on')
+    except Exception:  # noqa: BLE001
+        pass
+    return False  # 默认关闭
 
 
 def _today_range_cst():
@@ -253,6 +290,9 @@ def ai_asr():
     if not user_id:
         from owl_common.exception import UnauthorizedException
         raise UnauthorizedException("请先登录")
+    # 开关控制：关闭时直接拦截，友好提示
+    if not _asr_enabled():
+        return AjaxResponse.from_error(msg="语音识别功能未开启，请联系管理员")
     file = request.files.get('file')
     if not file or not file.filename:
         return AjaxResponse.from_error(msg="缺少音频文件")
@@ -282,7 +322,8 @@ def ai_config_get():
     return AjaxResponse.from_success(data={
         "configured": has_api_key(user_id),
         "model": get_model(user_id),
-        "maskedKey": mask_key(key) if key else ''
+        "maskedKey": mask_key(key) if key else '',
+        "asrEnabled": _asr_enabled(),
     })
 
 
@@ -527,9 +568,10 @@ def ai_chat_stream():
                         total_tokens = input_tokens + output_tokens
                         statistics_source = 'local_estimate'
                     print(f"[SSE流式] 入库前 token：session_id={actual_sid}, user_id={user_id}, model={model}, input={input_tokens}, output={output_tokens}, total={total_tokens}, source={statistics_source}")
+                    # 计费：根据模型单价计算本次调用费用（元）
+                    cost = _calc_cost(model, input_tokens, output_tokens)
                     with _app.app_context():
                         from sqlalchemy import insert
-                        # 只插本地表原本就存在的字段，不插 statistics_source 等新增字段
                         ins = insert(AiTokenRecordPo.__table__).values(
                             user_id=user_id, session_id=actual_sid,
                             prompt_tokens=input_tokens,
@@ -537,6 +579,7 @@ def ai_chat_stream():
                             total_tokens=total_tokens,
                             model=model,
                             statistics_source=statistics_source,
+                            cost=cost,
                         )
                         db.session.execute(ins)
                         db.session.commit()
@@ -805,23 +848,25 @@ def admin_ai_token_summary():
         from owl_common.exception import UnauthorizedException; raise UnauthorizedException("无权访问")
     try:
         today_start, today_end = _today_range_cst()
-        daily_stmt = select(func.count(AiTokenRecordPo.id), func.sum(AiTokenRecordPo.total_tokens), func.sum(AiTokenRecordPo.prompt_tokens), func.sum(AiTokenRecordPo.completion_tokens)).where(AiTokenRecordPo.create_time >= today_start, AiTokenRecordPo.create_time < today_end)
+        daily_stmt = select(func.count(AiTokenRecordPo.id), func.sum(AiTokenRecordPo.total_tokens), func.sum(AiTokenRecordPo.prompt_tokens), func.sum(AiTokenRecordPo.completion_tokens), func.coalesce(func.sum(AiTokenRecordPo.cost), 0)).where(AiTokenRecordPo.create_time >= today_start, AiTokenRecordPo.create_time < today_end)
         daily_row = db.session.execute(daily_stmt).one_or_none()
-        total_stmt = select(func.count(AiTokenRecordPo.id), func.sum(AiTokenRecordPo.total_tokens))
+        total_stmt = select(func.count(AiTokenRecordPo.id), func.sum(AiTokenRecordPo.total_tokens), func.coalesce(func.sum(AiTokenRecordPo.cost), 0))
         total_row = db.session.execute(total_stmt).one_or_none()
         return AjaxResponse.from_success(data={
             "dailyCalls": int(daily_row[0] or 0) if daily_row else 0,
             "dailyTokens": int(daily_row[1] or 0) if daily_row else 0,
             "dailyPromptTokens": int(daily_row[2] or 0) if daily_row else 0,
             "dailyCompletionTokens": int(daily_row[3] or 0) if daily_row else 0,
+            "dailyCost": round(float(daily_row[4] or 0), 4) if daily_row else 0,
             "totalCalls": int(total_row[0] or 0) if total_row else 0,
-            "totalTokens": int(total_row[1] or 0) if total_row else 0
+            "totalTokens": int(total_row[1] or 0) if total_row else 0,
+            "totalCost": round(float(total_row[2] or 0), 4) if total_row else 0,
         })
     except Exception:
         traceback.print_exc()
         return AjaxResponse.from_success(data={
             "dailyCalls": 0, "dailyTokens": 0, "dailyPromptTokens": 0,
-            "dailyCompletionTokens": 0, "totalCalls": 0, "totalTokens": 0,
+            "dailyCompletionTokens": 0, "dailyCost": 0, "totalCalls": 0, "totalTokens": 0, "totalCost": 0,
         })
 
 
@@ -1038,6 +1083,100 @@ def admin_ai_platform_key_alert():
     except Exception:
         traceback.print_exc()
         return AjaxResponse.from_success(data={"alert": False, "failCount": 0, "reason": ""})
+
+
+@reg.api.route("/admin/ai/asr", methods=["GET"])
+@JsonSerializer()
+def admin_ai_asr_status():
+    """查询 ASR 语音识别开关状态（管理员）"""
+    if not _is_admin():
+        from owl_common.exception import UnauthorizedException
+        raise UnauthorizedException("无权访问")
+    return AjaxResponse.from_success(data={"enabled": _asr_enabled()})
+
+
+@reg.api.route("/admin/ai/asr", methods=["POST"])
+@JsonSerializer()
+def admin_ai_asr_toggle():
+    """开启/关闭 ASR 语音识别（后台开关，存 sys_config）"""
+    if not _is_admin():
+        from owl_common.exception import UnauthorizedException
+        raise UnauthorizedException("无权访问")
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get('enabled', False))
+    try:
+        from owl_system.mapper import SysConfigMapper
+        from owl_system.service import SysConfigService
+        from owl_system.domain.entity import SysConfig
+        value = 'true' if enabled else 'false'
+        existing = SysConfigMapper.select_config(SysConfig(config_key="ai.asr.enabled"))
+        if existing and existing.config_id:
+            existing.config_value = value
+            existing.update_by_user(SecurityUtil.get_username())
+            SysConfigService.update_config(existing)
+        else:
+            cfg = SysConfig(
+                config_name="AI语音识别开关",
+                config_key="ai.asr.enabled",
+                config_value=value,
+                config_type="N",
+                remark="是否开启语音识别（true开启/false关闭，默认关闭）",
+            )
+            cfg.create_by_user(SecurityUtil.get_username())
+            SysConfigService.insert_config(cfg)
+        return AjaxResponse.from_success(msg="已" + ("开启" if enabled else "关闭") + "语音识别")
+    except Exception as e:  # noqa: BLE001
+        return AjaxResponse.from_error(msg=f"操作失败：{e}")
+
+
+@reg.api.route("/admin/ai/model-prices", methods=["GET"])
+@JsonSerializer()
+def admin_ai_model_prices():
+    """查询模型单价配置列表（计费用，单位 元/百万 token）"""
+    if not _is_admin():
+        from owl_common.exception import UnauthorizedException
+        raise UnauthorizedException("无权访问")
+    try:
+        from owl_ai.domain.po import AiModelPricePo
+        rows = db.session.execute(select(AiModelPricePo).order_by(AiModelPricePo.id)).scalars().all()
+        data = [{"id": p.id, "model": p.model, "provider": p.provider or '', "inputPrice": p.input_price or 0, "outputPrice": p.output_price or 0} for p in rows]
+        return AjaxResponse.from_success(data=data)
+    except Exception:
+        traceback.print_exc()
+        return AjaxResponse.from_success(data=[])
+
+
+@reg.api.route("/admin/ai/model-price", methods=["POST"])
+@JsonSerializer()
+def admin_ai_model_price_save():
+    """保存/更新模型单价（管理员配置计费单价）"""
+    if not _is_admin():
+        from owl_common.exception import UnauthorizedException
+        raise UnauthorizedException("无权访问")
+    data = request.get_json(silent=True) or {}
+    model = (data.get('model') or '').strip()
+    if not model:
+        return AjaxResponse.from_error(msg="模型名不能为空")
+    try:
+        from owl_ai.domain.po import AiModelPricePo
+        input_price = float(data.get('inputPrice', 0) or 0)
+        output_price = float(data.get('outputPrice', 0) or 0)
+        provider = (data.get('provider') or '').strip()
+        existing = db.session.execute(select(AiModelPricePo).where(AiModelPricePo.model == model)).scalar_one_or_none()
+        if existing:
+            existing.input_price = input_price
+            existing.output_price = output_price
+            existing.provider = provider
+        else:
+            db.session.add(AiModelPricePo(model=model, provider=provider, input_price=input_price, output_price=output_price))
+        db.session.commit()
+        return AjaxResponse.from_success(msg="模型单价已保存")
+    except Exception as e:  # noqa: BLE001
+        try:
+            db.session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return AjaxResponse.from_error(msg=f"保存失败：{e}")
 
 
 # ==================== SocketIO ====================

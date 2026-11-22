@@ -3,9 +3,9 @@
     <!-- 汇总卡片 -->
     <el-row :gutter="20" style="margin-bottom:20px;">
       <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">今日调用次数</div><div class="summary-value">{{ summary.dailyCalls }}</div></div></el-card></el-col>
-      <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">今日消耗 Token</div><div class="summary-value">{{ summary.dailyTokens }}</div></div></el-card></el-col>
+      <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">今日消耗 Token</div><div class="summary-value">{{ summary.dailyTokens }}</div><div class="summary-sub">¥{{ summary.dailyCost }}</div></div></el-card></el-col>
       <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">累计调用次数</div><div class="summary-value">{{ summary.totalCalls }}</div></div></el-card></el-col>
-      <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">累计总 Token</div><div class="summary-value">{{ summary.totalTokens }}</div></div></el-card></el-col>
+      <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">累计总 Token</div><div class="summary-value">{{ summary.totalTokens }}</div><div class="summary-sub">¥{{ summary.totalCost }}</div></div></el-card></el-col>
       <el-col :span="4"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">今日额度（已用/限额）</div><div class="summary-value">{{ dailyUsage.todayTokens }} / {{ dailyUsage.dailyLimit }}</div></div></el-card></el-col>
     </el-row>
 
@@ -19,6 +19,9 @@
         <el-form-item>
           <el-button type="primary" icon="el-icon-check" @click="savePlatformKey">保存</el-button>
           <el-button v-if="platformKey.configured" type="danger" icon="el-icon-delete" @click="clearPlatformKey">清除</el-button>
+        </el-form-item>
+        <el-form-item label="语音识别">
+          <el-switch v-model="asrEnabled" @change="toggleAsr" />
         </el-form-item>
       </el-form>
       <div v-if="platformKey.configured" style="font-size:12px;color:#909399;">当前已配置：{{ platformKey.maskedKey }}</div>
@@ -153,13 +156,14 @@ export default {
       platformKey: { configured: false, maskedKey: '' },
       platformKeyInput: '',
       platformKeyAlert: { alert: false, reason: '' },
+      asrEnabled: false,
       chartData: { dailyTrend: [], modelUsage: [] },
       callLogList: [], callLogTotal: 0, callLogLoading: false,
       callLogQuery: { pageNum: 1, pageSize: 10, status: '', model: '' },
       queryParams: { pageNum: 1, pageSize: 10, userId: '', filterUser: '', dateFrom: '', dateTo: '' }
     }
   },
-  created() { this.fetchUsers(); this.fetchSummary(); this.fetchRecords(); this.fetchDailyUsage(); this.fetchProviderRate(); this.fetchPlatformKey(); this.fetchPlatformKeyAlert(); this.fetchTokenChart(); this.fetchCallLogs() },
+  created() { this.fetchUsers(); this.fetchSummary(); this.fetchRecords(); this.fetchDailyUsage(); this.fetchProviderRate(); this.fetchPlatformKey(); this.fetchPlatformKeyAlert(); this.fetchTokenChart(); this.fetchCallLogs(); this.fetchAsrStatus() },
   methods: {
     async fetchDailyUsage() {
       try { const res = await request({ url: '/ai/daily-usage', method: 'get' }); if (res && res.data) this.dailyUsage = res.data } catch (e) {}
@@ -187,6 +191,15 @@ export default {
         this.platformKeyInput = ''
         this.fetchPlatformKey()
       } catch (e) { this.$message.error('清除失败，请重试') }
+    },
+    async fetchAsrStatus() {
+      try { const res = await request({ url: '/admin/ai/asr', method: 'get' }); if (res && res.data) this.asrEnabled = !!res.data.enabled } catch (e) {}
+    },
+    async toggleAsr(val) {
+      try {
+        await request({ url: '/admin/ai/asr', method: 'post', data: { enabled: val } })
+        this.$message.success(val ? '已开启语音识别' : '已关闭语音识别')
+      } catch (e) { this.$message.error('操作失败，请重试'); this.asrEnabled = !val }
     },
     async fetchPlatformKeyAlert() {
       try { const res = await request({ url: '/admin/ai/platform-key-alert', method: 'get' }); if (res && res.data) this.platformKeyAlert = res.data } catch (e) {}
@@ -277,4 +290,5 @@ export default {
 .summary-item { text-align: center; padding: 8px 0; }
 .summary-label { font-size: 13px; color: #909399; margin-bottom: 8px; }
 .summary-value { font-size: 28px; font-weight: bold; color: #409eff; }
+.summary-sub { font-size: 13px; color: #e6a23c; margin-top: 4px; }
 </style>

@@ -81,11 +81,18 @@
 - 用户用量面板：`/ai/daily-usage`（汇总）+ `/ai/my-token-records`（个人明细）；
 - 管理员后台：`/admin/ai/token-records`（全量）+ `/admin/ai/token-summary`（汇总）。
 
-### 四、ASR 语音输入（轻量版）
+### 三.5、计费统计（模型单价 + 费用自动计算）
+
+- `ai_model_price` 表配置各模型单价（输入/输出，单位 元/百万 token）；
+- 每次调用自动计算费用：`(输入token×输入单价 + 输出token×输出单价) / 100万`，存入 `ai_token_record.cost`；
+- 后台汇总卡片展示今日/累计消耗金额，管理员可查看/修改模型单价（`/admin/ai/model-prices`）。
+
+### 四、ASR 语音输入（轻量版，后台开关控制）
 
 - 前端浏览器麦克风录音（MediaRecorder，audio/webm）→ 上传后端 `/ai/asr`；
 - 后端调用第三方云 ASR（OpenAI whisper，可切火山/讯飞）转文字；
-- 识别结果自动填充输入框，发送给大模型，同样走 token 统计入库。
+- 识别结果自动填充输入框，发送给大模型，同样走 token 统计入库；
+- **开关控制**：后台「AI Token 统计 → 语音识别」开关控制，默认关闭，开启后前端显示录音按钮（`/ai/asr` 同步校验）。
 
 ### 五、Electron 打包方案
 
@@ -117,14 +124,16 @@ pyinstaller app.spec --clean
 # 产物：dist/AI_Blog_System.exe（双击即用）
 ```
 
-### 方式三：Docker 部署（上线）
+### 方式三：Docker 一键部署（SQLite，推荐）
 
 ```bash
 docker compose up -d
-# 前端（nginx）：http://localhost
-# 后端（Flask）：http://localhost:9000
+# 访问：http://localhost:9000（单容器跑前后端 + SQLite）
 # 默认账号：admin / admin123
+# 可选：DEEPSEEK_API_KEY=sk-xxx 写进 .env，或登录后台填写平台 Key
 ```
+
+> 说明：`docker-compose.yml` 是 SQLite 单容器版（免装 MySQL/Redis）；如需 MySQL+Redis 架构，用 `docker-compose.mysql.yml`。
 
 ---
 
@@ -203,7 +212,18 @@ docker compose up -d
 | GET /ai/my-token-records | 个人 token 消耗明细 | 登录 |
 | POST /ai/asr | ASR 语音转文字 | 登录 |
 | GET /admin/ai/token-records | 全量 token 记录 | 管理员 |
-| GET /admin/ai/token-summary | token 汇总统计 | 管理员 |
+| GET /admin/ai/token-summary | token 汇总统计（含金额）| 管理员 |
+| GET /admin/ai/token-chart | Token 趋势/模型用量（ECharts）| 管理员 |
+| GET /admin/ai/call-logs | 供应商调用日志（含失败原因）| 管理员 |
+| GET /admin/ai/provider-success-rate | 供应商接口成功率 | 管理员 |
+| GET /admin/ai/platform-key | 查询平台 Key（打码）| 管理员 |
+| POST /admin/ai/platform-key | 保存平台 Key（加密）| 管理员 |
+| DELETE /admin/ai/platform-key | 清除平台 Key | 管理员 |
+| GET /admin/ai/platform-key-alert | 平台 Key 余额告警 | 管理员 |
+| GET /admin/ai/asr | 查询 ASR 开关状态 | 管理员 |
+| POST /admin/ai/asr | 开关 ASR 语音识别 | 管理员 |
+| GET /admin/ai/model-prices | 模型单价列表 | 管理员 |
+| POST /admin/ai/model-price | 保存模型单价 | 管理员 |
 | POST /common/upload | 图片上传 | 登录 |
 | GET /uploads/article/{filename} | 图片访问 | 无 |
 
@@ -231,3 +251,17 @@ docker compose up -d
 | 博客菜单丢失 | 菜单数据不在 SQL 里，重建后丢 | 补 `blog_menu.sql` 兜底 |
 | 封面图上传 413 | nginx 默认 `client_max_body_size=1MB` | 调至 20m |
 | 封面图预览空白 | `send_from_directory` 相对路径被 `app.root_path` 解析错 | `_upload_dir` 用绝对路径 |
+
+---
+
+## ⚠️ 已知局限与后续迭代规划
+
+| 模块 | 当前局限 | 后续规划 |
+|------|----------|----------|
+| ASR | 用第三方云 ASR（OpenAI whisper），依赖外网 | 可替换成本地 FunASR（离线、免费）|
+| Electron | 打包版依赖本机 Python；未做自动更新/代码签名 | PyInstaller 打包 exe 免 Python；自动更新/签名见 `electron/ELECTRON_GUIDE.md` |
+| 计费 | 单价为示例值，费用为估算 | 对接厂商真实账单、精细化对账 |
+| 软件签名 | 未签名，Windows 会提示"未知发布者" | 购买代码签名证书 |
+| 自动更新 | 未实现 | 见 `electron/ELECTRON_GUIDE.md` 方案 |
+
+**暂不开发的规划项**（已写方案文档，不上演示包）：软件签名、自动更新、精细计费对账、本地 FunASR。

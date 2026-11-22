@@ -28,3 +28,14 @@ CREATE TABLE IF NOT EXISTS `ai_provider_call_log` (
   PRIMARY KEY (`id`),
   KEY `idx_provider_time` (`provider`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 服务商调用日志表（容灾切换 + 成功率统计）';
+
+CREATE TABLE IF NOT EXISTS `ai_model_price` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `model` varchar(50) NOT NULL COMMENT '模型名称',
+  `provider` varchar(50) DEFAULT '' COMMENT '供应商',
+  `input_price` double DEFAULT 0 COMMENT '输入单价（元/百万token）',
+  `output_price` double DEFAULT 0 COMMENT '输出单价（元/百万token）',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_model` (`model`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='模型单价配置表（计费用）';

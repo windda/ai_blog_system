@@ -1,100 +1,41 @@
 # ============================================================
-# Docker Compose - 博客管理系统全栈部署
-# 
-# 适用平台：Linux / Windows / macOS
-# 启动命令：docker compose up -d
-# 访问地址：http://localhost:9000 （如果同时启动前端，请访问 http://localhost）
+# Docker Compose - AI 博客系统（SQLite 一键部署版）
 #
-# 服务说明：
-#   mysql：    MySQL 8.0 数据库，自动初始化表结构
-#   redis：    Redis 7 缓存
-#   backend：  Flask 3.0 后端 API
-#   frontend： Vue 2 前端页面（Nginx 托管）
+# 启动命令：docker compose up -d
+# 访问地址：http://localhost:9000
+# 默认账号：admin / admin123
+#
+# 说明：
+#   - 单容器跑整套前后端（Flask 同源托管 Vue 前端）；
+#   - 数据库 SQLite（持久化到 sqlite_data 卷），缓存内存版 Redis；
+#   - 如需 MySQL + Redis 架构，见 docker-compose.mysql.yml。
+#
+# 可选环境变量（.env 文件）：
+#   DEEPSEEK_API_KEY=sk-xxx   # 平台全局 Key（也可登录后台填写，加密存数据库）
 # ============================================================
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: blog-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: ry-vue-py
-      TZ: Asia/Shanghai
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./sql/ry_20230706.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./sql/blog_init.sql:/docker-entrypoint-initdb.d/02-blog.sql
-      - ./sql/ruoyi2owl.sql:/docker-entrypoint-initdb.d/03-owl.sql
-      - ./sql/init_seed.sql:/docker-entrypoint-initdb.d/04-seed.sql
-      - ./sql/demo_data.sql:/docker-entrypoint-initdb.d/05-demo.sql
-      - ./sql/blog_menu.sql:/docker-entrypoint-initdb.d/06-menu.sql
-    command: |
-      --default-authentication-plugin=mysql_native_password
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --character-set-client-handshake=FALSE
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: blog-redis
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  backend:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: blog-backend
+    container_name: ai-blog
     ports:
       - "9000:9000"
     volumes:
-      - uploads_data:/app/uploads
+      - sqlite_data:/app/instance       # SQLite 数据库持久化
+      - uploads_data:/app/uploads        # 上传文件持久化
     environment:
       - TZ=Asia/Shanghai
-      - REDIS_URL=redis://redis:6379/1
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 30s
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  frontend:
-    image: nginx:1.25-alpine
-    container_name: blog-frontend
-    ports:
-      - "80:80"
-    volumes:
-      - ./owl-ui/dist:/usr/share/nginx/html:ro
-      - ./owl-ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      backend:
-        condition: service_healthy
+      start_period: 40s
     restart: unless-stopped
 
 volumes:
-  mysql_data:
-  redis_data:
+  sqlite_data:
   uploads_data:

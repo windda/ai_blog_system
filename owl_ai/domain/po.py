@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from typing import Optional
-from sqlalchemy import CHAR, DateTime, String, Text, Integer, text
+from sqlalchemy import CHAR, DateTime, String, Text, Integer, Float, text
 from sqlalchemy.orm import Mapped, mapped_column
 import datetime
 
@@ -49,6 +49,7 @@ class AiTokenRecordPo(db.Model):
     prompt_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='提示Token数')
     completion_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='回复Token数')
     total_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='总Token数')
+    cost: Mapped[Optional[float]] = mapped_column(Float, default=0, comment='本次调用费用（元）')
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输入token数')
     output_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输出token数')
     model: Mapped[Optional[str]] = mapped_column(String(50), default='deepseek-chat', comment='模型名称')
@@ -71,4 +72,18 @@ class AiProviderCallLogPo(db.Model):
     error_category: Mapped[Optional[str]] = mapped_column(String(32), default='', comment='失败原因分类：timeout/429/500/auth/network/http_xxx/exception')
     error_message: Mapped[Optional[str]] = mapped_column(String(500), default='', comment='失败详情')
     latency_ms: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='耗时（毫秒）')
+    create_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
+
+
+class AiModelPricePo(db.Model):
+    """模型单价配置表（计费：输入/输出 token 单价，单位 元/百万 token）"""
+
+    __tablename__ = 'ai_model_price'
+    __table_args__ = {'comment': '模型单价配置表'}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    model: Mapped[str] = mapped_column(String(50), unique=True, comment='模型名称')
+    provider: Mapped[Optional[str]] = mapped_column(String(50), default='', comment='供应商')
+    input_price: Mapped[Optional[float]] = mapped_column(Float, default=0, comment='输入单价（元/百万token）')
+    output_price: Mapped[Optional[float]] = mapped_column(Float, default=0, comment='输出单价（元/百万token）')
     create_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, server_default=text('CURRENT_TIMESTAMP'))

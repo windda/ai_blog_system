@@ -109,3 +109,15 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'enable_platform_k
 --       平台 Key 兜底环境变量 DEEPSEEK_API_KEY；
 --       每日限额按角色：普通用户 10000 token、管理员 50000 token。
 
+-- ============================================================
+-- 8. 模型单价配置（计费用，示例单价，可在后台修改）
+-- ============================================================
+-- 单价单位：元/百万 token（输入 / 输出）
+INSERT INTO ai_model_price (model, provider, input_price, output_price) VALUES
+('deepseek-chat', 'deepseek', 0.27, 1.10),
+('deepseek-reasoner', 'deepseek', 0.55, 2.19),
+('hunyuan-lite', 'hunyuan', 0.00, 0.00),
+('hunyuan-standard', 'hunyuan', 0.50, 1.00)
+ON DUPLICATE KEY UPDATE input_price=VALUES(input_price), output_price=VALUES(output_price);
+
+

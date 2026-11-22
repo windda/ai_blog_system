@@ -118,14 +118,8 @@
       <div class="chat-input">
         <el-input type="textarea" :rows="3" v-model="inputText" placeholder="输入消息，Enter 发送..." :disabled="isLoading" @keydown.enter.native="handleEnter"></el-input>
         <div class="chat-input-actions">
-          <!-- ============================================================
-               ASR 语音输入按钮：主分支已隐藏（保留代码不删除）。
-               语音识别功能在 feature-asr 分支迭代，作为后续扩展。
-               恢复方法：切换到 feature-asr 分支，或删除下方 HTML 注释。
-          ============================================================ -->
-          <!--
-          <el-button :type="isRecording ? 'danger' : 'default'" :icon="isRecording ? 'el-icon-close' : 'el-icon-microphone'" :loading="asrLoading" @click="toggleRecord">{{ isRecording ? '停止录音' : '语音输入' }}</el-button>
-          -->
+          <!-- ASR 语音输入按钮：由后台开关 ai.asr.enabled 控制（默认关闭，管理员后台开启后显示） -->
+          <el-button v-if="asrEnabled" :type="isRecording ? 'danger' : 'default'" :icon="isRecording ? 'el-icon-close' : 'el-icon-microphone'" :loading="asrLoading" @click="toggleRecord">{{ isRecording ? '停止录音' : '语音输入' }}</el-button>
           <el-button type="primary" :loading="isLoading" :disabled="!inputText.trim()" @click="sendMessage">发送</el-button>
         </div>
       </div>
@@ -144,7 +138,7 @@ export default {
       sessions: [], currentSessionId: null, messages: [], inputText: '',
       isLoading: false, remaining: null,
       renameDialogVisible: false, renameForm: { sessionId: null, title: '' },
-      configDialogVisible: false, apiKeyInput: '', configured: false, maskedKey: '', configModel: 'deepseek-chat',
+      configDialogVisible: false, apiKeyInput: '', configured: false, maskedKey: '', configModel: 'deepseek-chat', asrEnabled: false,
       currentModel: localStorage.getItem('ai_model') || 'deepseek-chat',
       providerList: [],
       // 用户个人用量面板
@@ -321,6 +315,7 @@ export default {
         this.configured = !!(res.data && res.data.configured)
         this.maskedKey = (res.data && res.data.maskedKey) || ''
         this.configModel = (res.data && res.data.model) || 'deepseek-chat'
+        this.asrEnabled = !!(res.data && res.data.asrEnabled)
       } catch (e) {}
     },
     // 打开配置弹窗
