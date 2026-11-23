@@ -17,8 +17,9 @@
 # ---------- 阶段 1：构建 Vue 前端 ----------
 FROM node:16-alpine AS frontend-build
 WORKDIR /build/owl-ui
-COPY owl-ui/package.json owl-ui/package-lock.json ./
-RUN npm ci --registry=https://registry.npmmirror.com
+# 只复制 package.json（package-lock.json 被 .gitignore 排除，不进 git，用 npm install 生成依赖）
+COPY owl-ui/package.json ./
+RUN npm install --registry=https://registry.npmmirror.com
 COPY owl-ui/ ./
 # node16 + webpack4 需要 openssl-legacy-provider；加大内存上限防 OOM
 ENV NODE_OPTIONS=--openssl-legacy-provider
