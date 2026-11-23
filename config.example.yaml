@@ -1,0 +1,57 @@
+# ============================================================
+# AI 统一调度网关配置模板（config.example.yaml）
+#
+# 使用说明：
+#   1. 复制本文件为 config.yaml（config.yaml 已被 .gitignore 排除，禁止提交）；
+#   2. 密钥不在此明文存储，只通过 api_key_env 引用环境变量名，
+#      运行时从环境变量（.env）读取，避免密钥泄露；
+#   3. 根据实际使用的服务商，设置对应的环境变量即可。
+#
+# 设计解耦：新增能力 / 服务商，只需在下面加一个配置块，不改调度核心代码。
+# ============================================================
+
+ai:
+  # 当前生效环境：dev（开发）/ prod（生产）
+  env: dev
+
+  # ---------- LLM 文本模型（多供应商聚合 + 故障降级）----------
+  llm:
+    # 供应商列表：按顺序调用；429限流/500服务端故障/超时 自动切换下一个供应商；
+    # 每个供应商最多重试 1 次（防止打爆上游）；enabled: true 启用 / false 关闭；
+    # api_key 通过 api_key_env 引用的环境变量读取，未配置 key 的供应商自动跳过。
+    providers:
+      deepseek:
+        enabled: true
+        base_url: https://api.deepseek.com/v1
+        api_key_env: DEEPSEEK_API_KEY
+        default_model: deepseek-chat
+        models: [deepseek-chat, deepseek-reasoner, deepseek-flash, deepseek-v4-pro]
+      qianfan:                               # 文心一言（百度千帆，OpenAI 兼容接口）
+        enabled: false
+        base_url: https://qianfan.baidubce.com/v2
+        api_key_env: QIANFAN_API_KEY
+        default_model: ernie-4.0-8k
+        models: [ernie-4.0-8k, ernie-3.5-8k]
+      hunyuan:                              # 腾讯混元（OpenAI 兼容接口）
+        enabled: true
+        base_url: https://api.hunyuan.cloud.tencent.com/v1
+        api_key_env: HUNYUAN_API_KEY
+        default_model: hunyuan-lite
+        models: [hunyuan-lite, hunyuan-standard]
+
+  # ---------- ASR 语音转写 ----------
+  asr:
+    dev:
+      provider: openai                   # 服务商：openai(whisper) / ali / xunfei 等
+      base_url: https://api.openai.com/v1
+      model: whisper-1
+      api_key_env: ASR_API_KEY
+      timeout: 60                        # 音频转写耗时较长，超时给足
+      max_retries: 1
+    prod:
+      provider: openai
+      base_url: https://api.openai.com/v1
+      model: whisper-1
+      api_key_env: ASR_API_KEY
+      timeout: 60
+      max_retries: 1
