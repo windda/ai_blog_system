@@ -87,3 +87,4 @@ _*.py
 test_api.py
 *.bak
 *.tar.gz
+plink.exe
