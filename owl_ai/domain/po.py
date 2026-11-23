@@ -54,6 +54,7 @@ class AiTokenRecordPo(db.Model):
     output_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='输出token数')
     model: Mapped[Optional[str]] = mapped_column(String(50), default='deepseek-chat', comment='模型名称')
     statistics_source: Mapped[Optional[str]] = mapped_column(String(32), default='api', comment='统计来源：api / local_estimate')
+    key_source: Mapped[Optional[str]] = mapped_column(String(16), default='platform', comment='密钥来源：platform平台Key / user用户自有Key')
     create_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, server_default=text('CURRENT_TIMESTAMP'))
 
 

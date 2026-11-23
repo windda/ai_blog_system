@@ -6,7 +6,7 @@
       <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">今日消耗 Token</div><div class="summary-value">{{ summary.dailyTokens }}</div><div class="summary-sub">¥{{ summary.dailyCost }}</div></div></el-card></el-col>
       <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">累计调用次数</div><div class="summary-value">{{ summary.totalCalls }}</div></div></el-card></el-col>
       <el-col :span="5"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">累计总 Token</div><div class="summary-value">{{ summary.totalTokens }}</div><div class="summary-sub">¥{{ summary.totalCost }}</div></div></el-card></el-col>
-      <el-col :span="4"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">今日额度（已用/限额）</div><div class="summary-value">{{ dailyUsage.todayTokens }} / {{ dailyUsage.dailyLimit }}</div></div></el-card></el-col>
+      <el-col :span="4"><el-card shadow="hover"><div class="summary-item"><div class="summary-label">平台额度（已用/限额）</div><div class="summary-value">{{ dailyUsage.todayPlatformTokens }} / {{ dailyUsage.dailyLimit }}</div></div></el-card></el-col>
     </el-row>
 
     <!-- 平台全局 API Key 配置（管理员） -->
@@ -151,7 +151,7 @@ export default {
       loading: false, total: 0, recordList: [],
       userList: [],
       summary: { dailyCalls: 0, dailyTokens: 0, totalCalls: 0, totalTokens: 0 },
-      dailyUsage: { todayTokens: 0, dailyLimit: 0 },
+      dailyUsage: { todayPlatformTokens: 0, dailyLimit: 0 },
       providerList: [],
       platformKey: { configured: false, maskedKey: '' },
       platformKeyInput: '',

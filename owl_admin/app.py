@@ -93,6 +93,7 @@ def _migrate_sqlite():
                 ('ai_token_record', 'output_tokens', "ALTER TABLE ai_token_record ADD COLUMN output_tokens INTEGER DEFAULT 0"),
                 ('ai_token_record', 'statistics_source', "ALTER TABLE ai_token_record ADD COLUMN statistics_source VARCHAR(32) DEFAULT 'api'"),
                 ('ai_token_record', 'cost', "ALTER TABLE ai_token_record ADD COLUMN cost FLOAT DEFAULT 0"),
+                ('ai_token_record', 'key_source', "ALTER TABLE ai_token_record ADD COLUMN key_source VARCHAR(16) DEFAULT 'platform'"),
                 ('ai_provider_call_log', 'user_id', "ALTER TABLE ai_provider_call_log ADD COLUMN user_id INTEGER"),
             ]
             for table, col, ddl in migrations:

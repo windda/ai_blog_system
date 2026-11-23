@@ -161,21 +161,53 @@ def _today_range_cst():
     return start_utc, end_utc
 
 
-def _get_today_tokens(user_id):
-    """按用户 + 东八区当天，汇总当日消耗 token（输入 + 输出），用于额度校验"""
+def _get_today_tokens(user_id, key_source=None):
+    """按用户 + 东八区当天，汇总当日消耗 token（输入 + 输出）
+
+    key_source: None 汇总全部；'platform' 只统计平台 Key；'user' 只统计用户自有 Key。
+    额度校验时只统计 platform 来源（用户自有 Key 不计入平台额度）。
+    """
     try:
         today_start, today_end = _today_range_cst()
-        # 今日消耗 = sum(输入 token + 输出 token)，与限额对比
-        stmt = select(
-            func.coalesce(func.sum(AiTokenRecordPo.prompt_tokens + AiTokenRecordPo.completion_tokens), 0)
-        ).where(
+        conditions = [
             AiTokenRecordPo.user_id == user_id,
             AiTokenRecordPo.create_time >= today_start,
             AiTokenRecordPo.create_time < today_end,
-        )
+        ]
+        if key_source:
+            conditions.append(AiTokenRecordPo.key_source == key_source)
+        # 今日消耗 = sum(输入 token + 输出 token)，与限额对比
+        stmt = select(
+            func.coalesce(func.sum(AiTokenRecordPo.prompt_tokens + AiTokenRecordPo.completion_tokens), 0)
+        ).where(*conditions)
         return int(db.session.execute(stmt).scalar() or 0)
     except Exception:  # noqa: BLE001
         return 0
+
+
+# QPS 频率限流配置：独立于 Token 额度，两种来源的调用都走频率校验
+QPS_LIMIT = {'platform': 5, 'user': 8}   # 每分钟最大请求次数
+QPS_PREFIX = "ai:qps:user:"
+
+
+def _check_qps_limit(user_id, key_source='platform'):
+    """QPS 频率限流（防并发打崩，独立于 Token 额度）
+
+    返回 (ok: bool, msg: str)。管理员不限流；限流异常时放行不阻断主流程。
+    """
+    if _is_admin():
+        return True, ''
+    limit = QPS_LIMIT.get(key_source, QPS_LIMIT['platform'])
+    rate_key = f"{QPS_PREFIX}{user_id}"
+    try:
+        count = redis_cache.incr(rate_key)
+        if count == 1:
+            redis_cache.expire(rate_key, 60)  # 60 秒滑动窗口
+        if count > limit:
+            return False, "请求过于频繁，请稍后再试"
+        return True, ''
+    except Exception:  # noqa: BLE001
+        return True, ''
 
 
 def _is_admin():
@@ -214,36 +246,45 @@ def ai_providers():
 @reg.api.route("/ai/daily-usage", methods=["GET"])
 @JsonSerializer()
 def ai_daily_usage():
-    """当前用户今日/累计用量（调用次数 + token + 每日限额）"""
+    """当前用户今日用量（平台额度 + 自有密钥，分开统计）
+
+    平台额度：只统计 key_source='platform'，受每日限额管控；
+    自有密钥：只统计 key_source='user'，不计入平台额度，无总量上限。
+    """
     user_id = SecurityUtil.get_user_id()
     daily_limit = _get_daily_token_limit(user_id)
     if not user_id:
         return AjaxResponse.from_success(data={
-            "todayCount": 0, "todayTokens": 0, "dailyLimit": daily_limit,
-            "totalCount": 0, "totalTokens": 0,
+            "todayPlatformTokens": 0, "todayPlatformCount": 0, "dailyLimit": daily_limit,
+            "todayUserTokens": 0, "todayUserCount": 0,
         })
-    # 东八区当天 [0点, 24点) 对应的 UTC 边界；今日消耗 = sum(输入 + 输出 token)
     today_start, today_end = _today_range_cst()
-    daily_stmt = select(
+    # 平台额度：只统计 platform 来源
+    platform_row = db.session.execute(select(
         func.count(AiTokenRecordPo.id),
         func.coalesce(func.sum(AiTokenRecordPo.prompt_tokens + AiTokenRecordPo.completion_tokens), 0),
     ).where(
         AiTokenRecordPo.user_id == user_id,
         AiTokenRecordPo.create_time >= today_start,
         AiTokenRecordPo.create_time < today_end,
-    )
-    daily_row = db.session.execute(daily_stmt).one_or_none()
-    total_stmt = select(
+        AiTokenRecordPo.key_source == 'platform',
+    )).one_or_none()
+    # 自有密钥：只统计 user 来源（不计入平台额度，无上限）
+    user_row = db.session.execute(select(
         func.count(AiTokenRecordPo.id),
         func.coalesce(func.sum(AiTokenRecordPo.prompt_tokens + AiTokenRecordPo.completion_tokens), 0),
-    ).where(AiTokenRecordPo.user_id == user_id)
-    total_row = db.session.execute(total_stmt).one_or_none()
+    ).where(
+        AiTokenRecordPo.user_id == user_id,
+        AiTokenRecordPo.create_time >= today_start,
+        AiTokenRecordPo.create_time < today_end,
+        AiTokenRecordPo.key_source == 'user',
+    )).one_or_none()
     return AjaxResponse.from_success(data={
-        "todayCount": int(daily_row[0] or 0) if daily_row else 0,
-        "todayTokens": int(daily_row[1] or 0) if daily_row else 0,
+        "todayPlatformTokens": int(platform_row[1] or 0) if platform_row else 0,
+        "todayPlatformCount": int(platform_row[0] or 0) if platform_row else 0,
         "dailyLimit": daily_limit,
-        "totalCount": int(total_row[0] or 0) if total_row else 0,
-        "totalTokens": int(total_row[1] or 0) if total_row else 0,
+        "todayUserTokens": int(user_row[1] or 0) if user_row else 0,
+        "todayUserCount": int(user_row[0] or 0) if user_row else 0,
     })
 
 
@@ -494,13 +535,17 @@ def ai_chat_stream():
     # key/model 获取：body 传的优先，兜底从 ai_config.json 按 user_id 读（BYOK，对齐线上原版）
     api_key = (data.get('apiKey') or data.get('api_key') or '').strip()
     model = (data.get('model') or '').strip()
+    key_source = 'user' if api_key else None  # body 传的 Key 视为用户自有
     from owl_ai.util.ai_config import get_api_key, get_model
     if not api_key:
         api_key = get_api_key(user_id)  # 模式 B：用户自有 Key（加密存储）
+        if api_key:
+            key_source = 'user'
     if not api_key:
         # 模式 A：平台全局 Key（受开关 enable_platform_key_fallback 控制）
         if _platform_key_fallback_enabled():
             api_key = _get_platform_api_key()  # 后台参数 ai.platform.api.key > 环境变量 DEEPSEEK_API_KEY
+            key_source = 'platform'
         else:
             # 关闭兜底：用户没有自有 Key，直接拦截，不使用平台公共 Key
             import json as _json
@@ -513,15 +558,24 @@ def ai_chat_stream():
     if not message:
         return AjaxResponse.from_error(msg="消息不能为空")
 
-    # 每日 Token 限额校验：平台限额是后端服务防护限流，独立于厂商额度，
-    # 两种调用模式（平台 Key / 用户自有 Key）都受此管控，超限直接拒绝，不调大模型接口
-    today_tokens = _get_today_tokens(user_id)
-    daily_limit = _get_daily_token_limit(user_id)
-    if today_tokens >= daily_limit:
+    # QPS 频率限流：独立于 Token 额度，两种来源（平台 Key / 用户自有 Key）都校验
+    qps_ok, qps_msg = _check_qps_limit(user_id, key_source)
+    if not qps_ok:
         import json as _json
         from flask import Response
-        err = _json.dumps({"error": "今日Token额度已耗尽，请明天再试"}, ensure_ascii=False)
+        err = _json.dumps({"error": qps_msg}, ensure_ascii=False)
         return Response('data: ' + err + '\n\n', mimetype='text/event-stream')
+
+    # 平台 Token 额度校验：只统计 key_source='platform' 的记录
+    # 用户自有 Key（key_source='user'）不计入平台每日额度，无 token 总量上限
+    if key_source == 'platform':
+        today_tokens = _get_today_tokens(user_id, 'platform')
+        daily_limit = _get_daily_token_limit(user_id)
+        if today_tokens >= daily_limit:
+            import json as _json
+            from flask import Response
+            err = _json.dumps({"error": "今日平台Token额度已耗尽，请明天再试"}, ensure_ascii=False)
+            return Response('data: ' + err + '\n\n', mimetype='text/event-stream')
 
     # 构建上下文（含历史摘要 + 近期消息），并保存用户提问
     context, actual_sid = AiChatService.build_context(user_id, session_id, message)
@@ -580,6 +634,7 @@ def ai_chat_stream():
                             model=model,
                             statistics_source=statistics_source,
                             cost=cost,
+                            key_source=key_source,
                         )
                         db.session.execute(ins)
                         db.session.commit()

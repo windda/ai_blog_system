@@ -435,7 +435,7 @@ class AIGatewayClient:
     @classmethod
     def _log_call(cls, user_id, session_id, ai_type, model,
                   prompt_tokens=0, completion_tokens=0, total_tokens=0,
-                  input_tokens=0, output_tokens=0):
+                  input_tokens=0, output_tokens=0, key_source='platform'):
         """统一日志记录：写入 ai_token_record（失败不影响主流程）"""
         try:
             from owl_admin.ext import db
@@ -465,6 +465,7 @@ class AIGatewayClient:
                 output_tokens=output_tokens,
                 model=model,
                 cost=cost,
+                key_source=key_source,
             )
             db.session.add(record)
             db.session.commit()

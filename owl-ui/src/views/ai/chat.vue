@@ -63,12 +63,18 @@
 
     <!-- 用户个人用量面板 -->
     <el-dialog title="我的用量" :visible.sync="usageDialogVisible" width="760px" append-to-body>
+      <!-- 平台额度：只统计平台 Key 消耗，受每日限额管控 -->
+      <div class="usage-section-title">平台额度</div>
       <div class="usage-cards">
-        <div class="usage-card"><div class="usage-card-value">{{ usage.todayCount }}</div><div class="usage-card-label">今日调用次数</div></div>
-        <div class="usage-card"><div class="usage-card-value">{{ usage.todayTokens }}</div><div class="usage-card-label">今日消耗 Token</div></div>
-        <div class="usage-card"><div class="usage-card-value">{{ usage.todayTokens }} / {{ usage.dailyLimit }}</div><div class="usage-card-label">今日额度（已用/限额）</div></div>
-        <div class="usage-card"><div class="usage-card-value">{{ usage.totalCount }}</div><div class="usage-card-label">累计调用次数</div></div>
-        <div class="usage-card"><div class="usage-card-value">{{ usage.totalTokens }}</div><div class="usage-card-label">累计总 Token</div></div>
+        <div class="usage-card"><div class="usage-card-value">{{ usage.todayPlatformTokens }}</div><div class="usage-card-label">今日已消耗 Token</div></div>
+        <div class="usage-card"><div class="usage-card-value">{{ usage.todayPlatformTokens }} / {{ usage.dailyLimit }}</div><div class="usage-card-label">平台额度（已用/限额）</div></div>
+        <div class="usage-card"><div class="usage-card-value">{{ usage.todayPlatformCount }}</div><div class="usage-card-label">今日调用次数</div></div>
+      </div>
+      <!-- 自有密钥调用统计：不计入平台额度，无总量上限 -->
+      <div class="usage-section-title">自有密钥调用统计（不计入平台额度）</div>
+      <div class="usage-cards">
+        <div class="usage-card"><div class="usage-card-value">{{ usage.todayUserTokens }}</div><div class="usage-card-label">今日消耗 Token</div></div>
+        <div class="usage-card"><div class="usage-card-value">{{ usage.todayUserCount }}</div><div class="usage-card-label">今日调用次数</div></div>
       </div>
       <el-table :data="myRecords" v-loading="myRecordsLoading" size="mini" style="margin-top:16px;" max-height="360">
         <el-table-column prop="createTime" label="时间" width="160" />
@@ -90,7 +96,7 @@
             <el-option v-for="m in p.models" :key="m" :label="m" :value="m" />
           </el-option-group>
         </el-select>
-        <span class="limit-tip">今日已用：<strong>{{ usage.todayTokens }}</strong> / {{ usage.dailyLimit }} token</span>
+        <span class="limit-tip">平台额度已用：<strong>{{ usage.todayPlatformTokens }}</strong> / {{ usage.dailyLimit }} token</span>
         <el-tag :type="configured ? 'success' : 'info'" size="mini">{{ configured ? '自有 Key 模式' : '平台统一额度模式' }}</el-tag>
         <el-button size="mini" icon="el-icon-data-line" @click="openUsage">我的用量</el-button>
         <el-button size="mini" icon="el-icon-setting" @click="openConfig">设置 Key</el-button>
@@ -142,7 +148,7 @@ export default {
       currentModel: localStorage.getItem('ai_model') || 'deepseek-chat',
       providerList: [],
       // 用户个人用量面板
-      usage: { todayCount: 0, todayTokens: 0, dailyLimit: 0, totalCount: 0, totalTokens: 0 },
+      usage: { todayPlatformTokens: 0, todayPlatformCount: 0, dailyLimit: 0, todayUserTokens: 0, todayUserCount: 0 },
       usageDialogVisible: false, myRecords: [], myRecordsLoading: false,
       // ASR 录音
       isRecording: false, mediaRecorder: null, audioChunks: [], asrLoading: false
@@ -475,6 +481,7 @@ export default {
 .chat-input { padding: 16px 20px; background: #fff; border-top: 1px solid #ebeef5; }
 .chat-input-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
 .usage-cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.usage-section-title { font-size: 13px; font-weight: 600; color: #606266; margin: 14px 0 8px; }
 .usage-card { flex: 1; min-width: 120px; background: #f5f7fa; border-radius: 8px; padding: 14px; text-align: center; }
 .usage-card-value { font-size: 20px; font-weight: 600; color: #303133; }
 .usage-card-label { font-size: 12px; color: #909399; margin-top: 6px; }
