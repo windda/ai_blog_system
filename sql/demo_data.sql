@@ -1,8 +1,8 @@
 SET NAMES utf8mb4;
 -- ============================================================
--- 个人博客管理系统 - 面试演示数据
+-- 个人博客管理系统 - 示例数据
 --
--- 用途：补齐普通用户 + 普通用户文章，用于演示 RBAC 数据隔离
+-- 用途：补齐普通用户与示例文章，用于验证 RBAC 数据隔离
 -- 说明：所有普通用户密码均为 admin123
 -- 执行顺序：在 blog_init.sql 之后、可选
 -- ============================================================
@@ -41,7 +41,7 @@ INSERT IGNORE INTO sys_role_menu (role_id, menu_id) VALUES
 (2, 2031);  -- 标签查询
 
 -- ============================================================
--- 4. 普通用户自己的文章（用于演示数据隔离）
+-- 4. 普通用户自己的文章（用于验证数据隔离）
 --    zhangsan 2 篇已发布，lisi 1 篇已发布，wangwu 1 篇草稿
 -- ============================================================
 INSERT INTO blog_article (article_id, title, content, summary, cover_image, category_id, author_id, status, is_top, view_count, like_count, create_by, create_time, update_by, update_time, remark) VALUES
@@ -58,8 +58,8 @@ INSERT INTO blog_article (article_id, title, content, summary, cover_image, cate
 '总结前端性能优化的常见手段与实战经验。',
 '', 4, 4, '1', '0', 28, 1, 'lisi', NOW(), 'lisi', NOW(), ''),
 (9, '关于生活与编程的思考（草稿）',
-'<p>这是一篇还未完成的草稿文章，用于演示草稿状态。</p>',
-'草稿状态的演示文章。',
+'<p>这是一篇还未完成的草稿文章，用于展示草稿状态。</p>',
+'草稿状态的示例文章。',
 '', 2, 5, '0', '0', 0, 0, 'wangwu', NOW(), 'wangwu', NOW(), '草稿-未完成')
 ON DUPLICATE KEY UPDATE title=VALUES(title);
 

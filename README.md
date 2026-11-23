@@ -54,20 +54,20 @@
 
 ---
 
-## 🤖 多模型 Token 聚合网关（面试重点）
+## 🤖 多模型 Token 聚合网关
 
-### 一、双密钥模式（对应 JD：Token 聚合平台）
+### 一、双密钥模式
 
 | 模式 | 说明 | 存储 |
 |------|------|------|
-| 模式 A：平台全局 Key | 管理员后台统一配置，所有用户共用 | sys_config（`ai.platform.api.key`）|
+| 模式 A：平台全局 Key | 管理员后台统一配置，所有用户共用 | sys_config（`ai.platform.api.key`，加密存储）|
 | 模式 B：用户自有 Key | 用户在个人中心填写自己的模型密钥 | ai_config.json（对称加密，禁止明文入库）|
 
-- **优先级**：用户自有 Key → 平台全局 Key → 环境变量兜底；
-- **两层限额**：
-  1. 厂商侧余额：DeepSeek / 混元等厂商自己管控，网关只捕获报错（401/403/429）分类返回前端；
-  2. 平台侧限额：每个用户独立单日 Token 上限（软防护），不管走哪个 Key 都生效，保护服务不被打垮；
-- 用户个人用量面板：只能查看自己的对话记录、token 消耗明细；管理员不变，查看全量记录。
+- **调用模式选择**：用户在对话页手动选择「平台统一额度 / 使用自己的 Key / 自动（自有优先）」，后端通过 `keySource` 参数区分；
+- **平台额度**：只统计平台 Key 的消耗（`key_source='platform'`），普通用户单日 10000 token、管理员 50000 token，超限返回「今日平台Token额度已耗尽」；
+- **用户自有 Key**：不计入平台每日额度，无 token 总量上限；
+- **QPS 频率限流**（独立于 Token 额度）：平台 Key 每分钟 5 次、用户自有 Key 每分钟 8 次，超限返回「请求过于频繁，请稍后再试」；
+- 厂商侧余额由厂商自己管控，网关捕获报错（401/403/429）分类返回前端。
 
 ### 二、多厂商容灾 + 故障切换
 
@@ -98,7 +98,7 @@
 
 - `electron/main.js`：主进程 spawn 启动 Flask 后端 + 加载 Vue 打包产物；
 - `electron/package.json`：electron-builder 配置，`npm run build:win` 打包 Windows x64 安装包（NSIS）；
-- 完整打包流程注释见 `electron/main.js` 顶部（面试重点讲，不纠结打包调试）。
+- 完整打包流程注释见 `electron/main.js` 顶部。
 
 ---
 
@@ -163,7 +163,7 @@ docker compose up -d
 ```
 - 单机个人博客可继续用 SQLite；多用户高并发可切回 MySQL（改 `app-dev.yml` 连接串 + `strftime`→`date_format` + `ext.py` 换回 FlaskRedis）。
 
-### 方案 B：Vercel 应急演示（免费临时）
+### 方案 B：Vercel 应急部署（免费临时）
 ```
 前端 dist → 部署到 Vercel（公网）
 后端 Flask → 本机跑 exe
@@ -264,4 +264,4 @@ docker compose up -d
 | 软件签名 | 未签名，Windows 会提示"未知发布者" | 购买代码签名证书 |
 | 自动更新 | 未实现 | 见 `electron/ELECTRON_GUIDE.md` 方案 |
 
-**暂不开发的规划项**（已写方案文档，不上演示包）：软件签名、自动更新、精细计费对账、本地 FunASR。
+**暂不开发的规划项**（已写方案文档）：软件签名、自动更新、精细计费对账、本地 FunASR。
