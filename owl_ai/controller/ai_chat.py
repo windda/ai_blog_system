@@ -532,26 +532,48 @@ def ai_chat_stream():
     data = request.get_json(silent=True) or {}
     message = (data.get('message') or '').strip()
     session_id = data.get('sessionId') or data.get('session_id')
-    # key/model 获取：body 传的优先，兜底从 ai_config.json 按 user_id 读（BYOK，对齐线上原版）
+    # key/model 获取：支持手动选择调用模式（keySource: platform / user / auto）
+    #   platform：强制平台统一额度；user：强制自己的 Key；auto：自有优先、平台兜底（默认）
     api_key = (data.get('apiKey') or data.get('api_key') or '').strip()
     model = (data.get('model') or '').strip()
-    key_source = 'user' if api_key else None  # body 传的 Key 视为用户自有
+    key_source_choice = (data.get('keySource') or data.get('key_source') or 'auto').strip()
     from owl_ai.util.ai_config import get_api_key, get_model
-    if not api_key:
-        api_key = get_api_key(user_id)  # 模式 B：用户自有 Key（加密存储）
-        if api_key:
-            key_source = 'user'
-    if not api_key:
-        # 模式 A：平台全局 Key（受开关 enable_platform_key_fallback 控制）
-        if _platform_key_fallback_enabled():
-            api_key = _get_platform_api_key()  # 后台参数 ai.platform.api.key > 环境变量 DEEPSEEK_API_KEY
-            key_source = 'platform'
-        else:
-            # 关闭兜底：用户没有自有 Key，直接拦截，不使用平台公共 Key
+    user_key = get_api_key(user_id)  # 用户自有 Key（加密存储）
+
+    if key_source_choice == 'platform':
+        # 用户主动选择「平台统一额度」：强制走平台 Key
+        api_key = _get_platform_api_key()
+        key_source = 'platform'
+        if not api_key:
             import json as _json
             from flask import Response
-            err = _json.dumps({"error": "请先在「设置 Key」中绑定你的 API Key（平台已关闭公共 Key 兜底）"}, ensure_ascii=False)
+            err = _json.dumps({"error": "平台全局 Key 未配置，请联系管理员"}, ensure_ascii=False)
             return Response('data: ' + err + '\n\n', mimetype='text/event-stream')
+    elif key_source_choice == 'user':
+        # 用户主动选择「使用自己的 Key」：强制走用户自有 Key
+        api_key = api_key or user_key
+        key_source = 'user'
+        if not api_key:
+            import json as _json
+            from flask import Response
+            err = _json.dumps({"error": "请先在「设置 Key」中绑定你的 API Key"}, ensure_ascii=False)
+            return Response('data: ' + err + '\n\n', mimetype='text/event-stream')
+    else:
+        # auto：body 传的 Key > 用户自有 Key > 平台 Key 兜底（默认）
+        key_source = 'user' if api_key else None
+        if not api_key:
+            api_key = user_key
+            if api_key:
+                key_source = 'user'
+        if not api_key:
+            if _platform_key_fallback_enabled():
+                api_key = _get_platform_api_key()  # 后台参数 ai.platform.api.key > 环境变量 DEEPSEEK_API_KEY
+                key_source = 'platform'
+            else:
+                import json as _json
+                from flask import Response
+                err = _json.dumps({"error": "请先在「设置 Key」中绑定你的 API Key（平台已关闭公共 Key 兜底）"}, ensure_ascii=False)
+                return Response('data: ' + err + '\n\n', mimetype='text/event-stream')
     if not model:
         model = get_model(user_id) or 'deepseek-chat'
 

@@ -97,7 +97,11 @@
           </el-option-group>
         </el-select>
         <span class="limit-tip">平台额度已用：<strong>{{ usage.todayPlatformTokens }}</strong> / {{ usage.dailyLimit }} token</span>
-        <el-tag :type="configured ? 'success' : 'info'" size="mini">{{ configured ? '自有 Key 模式' : '平台统一额度模式' }}</el-tag>
+        <el-select v-model="callMode" size="mini" style="width:150px;" title="选择调用模式">
+          <el-option label="平台统一额度" value="platform" />
+          <el-option label="使用自己的 Key" value="user" :disabled="!configured" />
+          <el-option label="自动（自有优先）" value="auto" />
+        </el-select>
         <el-button size="mini" icon="el-icon-data-line" @click="openUsage">我的用量</el-button>
         <el-button size="mini" icon="el-icon-setting" @click="openConfig">设置 Key</el-button>
       </div>
@@ -146,6 +150,7 @@ export default {
       renameDialogVisible: false, renameForm: { sessionId: null, title: '' },
       configDialogVisible: false, apiKeyInput: '', configured: false, maskedKey: '', configModel: 'deepseek-chat', asrEnabled: false,
       currentModel: localStorage.getItem('ai_model') || 'deepseek-chat',
+      callMode: 'auto',
       providerList: [],
       // 用户个人用量面板
       usage: { todayPlatformTokens: 0, todayPlatformCount: 0, dailyLimit: 0, todayUserTokens: 0, todayUserCount: 0 },
@@ -216,9 +221,10 @@ export default {
       const text = this.inputText.trim()
       if (!text || this.isLoading) return
 
-      // 双密钥模式：用户自有 Key（本地配置）优先，无 Key 时后端自动降级平台全局 Key，不强制配置
-      // key/model 从 localStorage 读（body 传），后端兜底：用户 Key -> 平台全局 Key -> 环境变量
-      const apiKey = localStorage.getItem('ai_api_key') || ''
+      // 调用模式：platform 强制平台统一额度 / user 强制自己的 Key / auto 自有优先
+      let apiKey = localStorage.getItem('ai_api_key') || ''
+      const keySource = this.callMode
+      if (this.callMode === 'platform') apiKey = ''  // 平台模式不传自有 Key
       const model = this.currentModel || localStorage.getItem('ai_model') || 'deepseek-chat'
 
       // 推送用户消息 + 空占位的 AI 消息（流式逐 token 填充）
@@ -238,7 +244,7 @@ export default {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + token
           },
-          body: JSON.stringify({ sessionId: this.currentSessionId, message: text, apiKey: apiKey, model: model })
+          body: JSON.stringify({ sessionId: this.currentSessionId, message: text, apiKey: apiKey, model: model, keySource: keySource })
         })
 
         if (!resp.ok) {
