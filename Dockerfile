@@ -21,8 +21,7 @@ WORKDIR /build/owl-ui
 COPY owl-ui/package.json ./
 RUN npm install --registry=https://registry.npmmirror.com
 COPY owl-ui/ ./
-# node16 + webpack4 需要 openssl-legacy-provider；加大内存上限防 OOM
-ENV NODE_OPTIONS=--openssl-legacy-provider
+# 加大内存上限防 OOM（node:16-alpine 为 OpenSSL 1.1.1，无需 openssl-legacy-provider）
 RUN node --max-old-space-size=2048 node_modules/.bin/vue-cli-service build
 
 # ---------- 阶段 2：Python 后端 ----------
