@@ -225,7 +225,10 @@ class SysUserService:
     @classmethod
     def register_user(cls, user: SysUser) -> bool:
         """
-        注册用户
+        注册用户（默认分配「普通角色」role_key='common'）
+
+        管理员角色（role_key='admin'）只能由管理员在后台「用户管理」授予/审核，
+        注册流程不自动分配管理员角色。
 
         Args:
             user (SysUser): 用户信息
@@ -233,8 +236,23 @@ class SysUserService:
         Returns:
             bool: 操作结果
         """
-        flag = SysUserMapper.insert_user(user)
-        return flag > 0
+        last_pid = SysUserMapper.insert_user(user)
+        if last_pid <= 0:
+            return False
+        user.user_id = last_pid
+        # 注册默认给普通用户角色（role_key='common'），不分配管理员角色
+        try:
+            from owl_system.domain.po import SysRolePo
+            from sqlalchemy import select
+            role_id = db.session.execute(
+                select(SysRolePo.role_id).where(SysRolePo.role_key == 'common').limit(1)
+            ).scalar()
+            if role_id:
+                cls.insert_user_role(last_pid, [int(role_id)])
+        except Exception:  # noqa: BLE001
+            # 角色分配失败不阻断注册（用户已入库，可后续由管理员补角色）
+            pass
+        return True
     
     @classmethod
     def update_user(cls, user: SysUser) -> bool:
